@@ -961,13 +961,8 @@ function mulberry32(a){
       pd,
       group: trackGroup,
       roadBody: road.body,
-      cornerPathIdx,
-      checkpoints: []
+      cornerPathIdx
     };
-    // 检查点：每 checkpointEvery 个弯一个
-    const every = CONFIG.race.checkpointEvery;
-    for (let c = 0; c < cornerPathIdx.length; c += every) track.checkpoints.push(c);
-    if (track.checkpoints.length === 0) track.checkpoints.push(0);
   }
 
   /* ---------------------------- 10. 游戏状态 ---------------------------- */
@@ -1169,7 +1164,7 @@ function mulberry32(a){
       if (state === State.L2 && crashLock <= 0){
         crashLock = 0.8;
         respawnAtCheckpoint();
-        Taunt.push('回到上一个检查点。它也不欢迎你。');
+        Taunt.push('原地复位。路还在原地。');
       }
       if (state === State.ENDING && endingReady) closeEnding();
     }, { passive:false });
@@ -1447,15 +1442,10 @@ function mulberry32(a){
     // 坑
     checkPotholes(pos, spd);
 
-    // 检查点
+    // 通关
     if (game.cornersPassed >= CONFIG.race.targetCorners){
       finishRace();
       return;
-    }
-    const cp = Math.floor(game.cornersPassed / CONFIG.race.checkpointEvery) * CONFIG.race.checkpointEvery;
-    if (cp > game.lastCheckpointCorner){
-      game.lastCheckpointCorner = cp;
-      Taunt.push('检查点。它不会安慰你。');
     }
 
     // 长时间不动：先嘲讽，再自救（任何原因卡住都不该让玩家永久停在那儿）
@@ -1600,12 +1590,12 @@ function mulberry32(a){
 
   function respawnAtCheckpoint(){
     if (!track) return;
-    const arr = track.cornerPathIdx;
-    const cpCorner = game.lastCheckpointCorner;
-    let idx = 6;
-    if (cpCorner > 0 && cpCorner < arr.length) idx = Math.max(4, arr[cpCorner] - 4);
-
+    // 原地复位：车身扶正、速度清零，不回退进度
+    const pos = bodyPos();
     const pd = track.pd;
+    // 找当前路面位置
+    const g = groundAt(pos.x, pos.z, carPathIdx, pos.y - 0.888);
+    const idx = g.idx;
     const p = pd.pts[idx];
     const T = pd.tangents[idx];
     const q = quatFromForward(T);
@@ -1615,10 +1605,6 @@ function mulberry32(a){
     chassisBody.setLinvel({ x:0, y:0, z:0 }, true);
     chassisBody.setAngvel({ x:0, y:0, z:0 }, true);
 
-    carPathIdx = idx;
-    game.progressIdx = idx;
-    game.cornerPointer = cpCorner;
-    game.cornersPassed = cpCorner;
     lastSpeed = null;
     flipTimer = 0;
     steerAngle = 0;
@@ -2288,7 +2274,7 @@ function mulberry32(a){
     if (e.code === 'KeyR' && state === State.L2 && crashLock <= 0){
       crashLock = 0.8;
       respawnAtCheckpoint();
-      Taunt.push('回到上一个检查点。它也不欢迎你。');
+      Taunt.push('原地复位。路还在原地。');
     }
   });
 })();
