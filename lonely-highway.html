@@ -125,6 +125,56 @@
     #toasts{ left:16px; bottom:150px; width:min(320px,72vw); }
   }
   @media print{ body{ background:#fff; color:#000; } canvas{ display:none; } }
+
+  /* ---- 触控操控 ---- */
+  #touchCtrl{ position:fixed; inset:0; pointer-events:none; z-index:40; display:none; }
+  #touchCtrl.on{ display:block; }
+  #touchCtrl .joystick{
+    position:absolute; left:24px; bottom:120px; width:128px; height:128px;
+    border:2px solid rgba(236,233,227,.16); border-radius:50%;
+    background:rgba(8,10,14,.4); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    pointer-events:auto; touch-action:none;
+  }
+  #touchCtrl .knob{
+    position:absolute; left:50%; top:50%; width:52px; height:52px;
+    margin:-26px 0 0 -26px; border-radius:50%;
+    background:rgba(236,233,227,.2); border:1px solid rgba(236,233,227,.3);
+    pointer-events:none; transition:background .15s ease, border-color .15s ease;
+  }
+  #touchCtrl .knob.active{ background:rgba(224,89,46,.4); border-color:rgba(224,89,46,.6); }
+  #touchCtrl .pedal{
+    position:absolute; right:24px; width:96px; height:96px; border-radius:50%;
+    border:2px solid rgba(236,233,227,.16); background:rgba(8,10,14,.4);
+    backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; letter-spacing:.1em; color:var(--dim);
+    pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none;
+    transition:background .1s, border-color .1s, color .1s;
+  }
+  #touchCtrl .pedal.active{ background:rgba(236,233,227,.16); border-color:rgba(236,233,227,.45); color:var(--ink); }
+  #touchCtrl .gas{ bottom:150px; }
+  #touchCtrl .brake{ bottom:42px; }
+  #touchCtrl .tbtn{
+    position:absolute; width:54px; height:54px; border-radius:50%;
+    border:1px solid rgba(236,233,227,.14); background:rgba(8,10,14,.4);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; letter-spacing:.06em; color:var(--dim);
+    pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none;
+    transition:background .1s, border-color .1s;
+  }
+  #touchCtrl .tbtn.active{ background:rgba(224,89,46,.28); border-color:rgba(224,89,46,.5); color:var(--ink); }
+  #touchCtrl .handbrake{ right:136px; bottom:100px; }
+  #touchCtrl .reset{ right:136px; bottom:32px; }
+  @media (max-width:760px){
+    #touchCtrl .joystick{ left:14px; bottom:140px; width:108px; height:108px; }
+    #touchCtrl .knob{ width:44px; height:44px; margin:-22px 0 0 -22px; }
+    #touchCtrl .pedal{ right:14px; width:82px; height:82px; font-size:12px; }
+    #touchCtrl .gas{ bottom:168px; }
+    #touchCtrl .brake{ bottom:56px; }
+    #touchCtrl .tbtn{ width:48px; height:48px; }
+    #touchCtrl .handbrake{ right:112px; bottom:118px; }
+    #touchCtrl .reset{ right:112px; bottom:44px; }
+  }
 </style>
 </head>
 <body>
@@ -182,6 +232,14 @@
 <div id="boot">
   <div class="bt">孤独的公路</div>
   <div class="bm" id="bootMsg">正在加载…</div>
+</div>
+
+<div id="touchCtrl">
+  <div class="joystick" id="joy"><div class="knob" id="knob"></div></div>
+  <div class="pedal gas" id="btnGas">油门</div>
+  <div class="pedal brake" id="btnBrake">刹车</div>
+  <div class="tbtn handbrake" id="btnHb">手刹</div>
+  <div class="tbtn reset" id="btnRst">复位</div>
 </div>
 
 <script type="module">
@@ -974,17 +1032,19 @@ function mulberry32(a){
     const down = keys['KeyS'] || keys['ArrowDown'];
     const left = keys['KeyA'] || keys['ArrowLeft'];
     const right = keys['KeyD'] || keys['ArrowRight'];
-    input.throttle = up ? 1 : 0;
-    input.brake = down ? 1 : 0;
-    input.handbrake = !!keys['Space'];
+    // 键盘 + 触控合并
+    input.throttle = (up ? 1 : 0) || touchInput.throttle;
+    input.brake = (down ? 1 : 0) || touchInput.brake;
+    input.handbrake = !!keys['Space'] || touchInput.handbrake;
     let s = 0;
     if (left) s -= 1;
     if (right) s += 1;
-    input.steer = s;
+    // 键盘有输入时优先键盘，否则取摇杆模拟量
+    input.steer = s !== 0 ? s : touchInput.steer;
 
     // 记录原始转向 + 时间戳，用于延迟队列（按真实时间取，不按帧数）
     const nowT = performance.now() / 1000;
-    steerHistory.push({ t: nowT, v: s });
+    steerHistory.push({ t: nowT, v: input.steer });
     while (steerHistory.length && nowT - steerHistory[0].t > 2.0) steerHistory.shift();
   }
 
@@ -996,6 +1056,130 @@ function mulberry32(a){
       if (steerHistory[i].t <= want) return steerHistory[i].v;
     }
     return 0;
+  }
+
+  /* ----------------------- 11b. 触控操控 ----------------------- */
+  const touchCtrlEl = document.getElementById('touchCtrl');
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const touchInput = { steer:0, throttle:0, brake:0, handbrake:false };
+
+  if (isTouch) touchCtrlEl.classList.add('on');
+
+  // ---- 摇杆（转向） ----
+  const joyEl = document.getElementById('joy');
+  const knobEl = document.getElementById('knob');
+  const JOY_MAX = 42;
+  let joyId = null;
+
+  if (isTouch){
+    joyEl.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      if (joyId !== null) return;
+      joyId = e.changedTouches[0].identifier;
+      knobEl.classList.add('active');
+      // 立即用初始触点位置计算转向
+      const t = e.changedTouches[0];
+      const r = joyEl.getBoundingClientRect();
+      const cx = r.left + r.width/2, cy = r.top + r.height/2;
+      let dx = t.clientX - cx, dy = t.clientY - cy;
+      dx = clamp(dx, -JOY_MAX, JOY_MAX);
+      dy = clamp(dy, -JOY_MAX, JOY_MAX);
+      knobEl.style.transform = `translate(${dx}px,${dy*0.35}px)`;
+      touchInput.steer = dx / JOY_MAX;
+    }, { passive:false });
+
+    joyEl.addEventListener('touchmove', (e)=>{
+      e.preventDefault();
+      if (joyId === null) return;
+      for (const t of e.changedTouches){
+        if (t.identifier !== joyId) continue;
+        const r = joyEl.getBoundingClientRect();
+        const cx = r.left + r.width/2, cy = r.top + r.height/2;
+        let dx = t.clientX - cx, dy = t.clientY - cy;
+        dx = clamp(dx, -JOY_MAX, JOY_MAX);
+        dy = clamp(dy, -JOY_MAX, JOY_MAX);
+        knobEl.style.transform = `translate(${dx}px,${dy*0.35}px)`;
+        touchInput.steer = dx / JOY_MAX;
+      }
+    }, { passive:false });
+
+    const joyEnd = (e)=>{
+      for (const t of e.changedTouches){
+        if (t.identifier !== joyId) continue;
+        joyId = null;
+        knobEl.classList.remove('active');
+        knobEl.style.transform = '';
+        touchInput.steer = 0;
+      }
+    };
+    joyEl.addEventListener('touchend', joyEnd);
+    joyEl.addEventListener('touchcancel', joyEnd);
+  }
+
+  // ---- 踏板（油门 / 刹车） ----
+  function bindPedal(el, key){
+    let pid = null;
+    el.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      if (pid !== null) return;
+      pid = e.changedTouches[0].identifier;
+      el.classList.add('active');
+      touchInput[key] = 1;
+    }, { passive:false });
+    const end = (e)=>{
+      for (const t of e.changedTouches){
+        if (t.identifier !== pid) continue;
+        pid = null;
+        el.classList.remove('active');
+        touchInput[key] = 0;
+      }
+    };
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+  }
+
+  if (isTouch){
+    bindPedal(document.getElementById('btnGas'), 'throttle');
+    bindPedal(document.getElementById('btnBrake'), 'brake');
+
+    // 手刹
+    const hbEl = document.getElementById('btnHb');
+    let hbPid = null;
+    hbEl.addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      if (hbPid !== null) return;
+      hbPid = e.changedTouches[0].identifier;
+      hbEl.classList.add('active');
+      touchInput.handbrake = true;
+    }, { passive:false });
+    const hbEnd = (e)=>{
+      for (const t of e.changedTouches){
+        if (t.identifier !== hbPid) continue;
+        hbPid = null;
+        hbEl.classList.remove('active');
+        touchInput.handbrake = false;
+      }
+    };
+    hbEl.addEventListener('touchend', hbEnd);
+    hbEl.addEventListener('touchcancel', hbEnd);
+
+    // 复位
+    document.getElementById('btnRst').addEventListener('touchstart', (e)=>{
+      e.preventDefault();
+      if (state === State.L2 && crashLock <= 0){
+        crashLock = 0.8;
+        respawnAtCheckpoint();
+        Taunt.push('回到上一个检查点。它也不欢迎你。');
+      }
+      if (state === State.ENDING && endingReady) closeEnding();
+    }, { passive:false });
+
+    // 通关画面：任意位置触摸关闭（不影响"再来一次"按钮）
+    document.addEventListener('touchstart', (e)=>{
+      if (state === State.ENDING && endingReady && !e.target.closest('#again')){
+        closeEnding();
+      }
+    });
   }
 
   /* ---------------------------- 12. 车辆物理 ---------------------------- */
