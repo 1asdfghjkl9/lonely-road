@@ -1164,7 +1164,7 @@ function mulberry32(a){
       if (state === State.L2 && crashLock <= 0){
         crashLock = 0.8;
         respawnAtCheckpoint();
-        Taunt.push('原地复位。路还在原地。');
+        Taunt.push('从头开始。路不记得你。');
       }
       if (state === State.ENDING && endingReady) closeEnding();
     }, { passive:false });
@@ -1590,12 +1590,9 @@ function mulberry32(a){
 
   function respawnAtCheckpoint(){
     if (!track) return;
-    // 原地复位：车身扶正、速度清零，不回退进度
-    const pos = bodyPos();
+    // 从头开始：回到赛道起点，进度清零
     const pd = track.pd;
-    // 找当前路面位置
-    const g = groundAt(pos.x, pos.z, carPathIdx, pos.y - 0.888);
-    const idx = g.idx;
+    const idx = 4;
     const p = pd.pts[idx];
     const T = pd.tangents[idx];
     const q = quatFromForward(T);
@@ -1605,6 +1602,10 @@ function mulberry32(a){
     chassisBody.setLinvel({ x:0, y:0, z:0 }, true);
     chassisBody.setAngvel({ x:0, y:0, z:0 }, true);
 
+    carPathIdx = idx;
+    game.progressIdx = idx;
+    game.cornerPointer = 0;
+    game.cornersPassed = 0;
     lastSpeed = null;
     flipTimer = 0;
     steerAngle = 0;
@@ -2274,7 +2275,7 @@ function mulberry32(a){
     if (e.code === 'KeyR' && state === State.L2 && crashLock <= 0){
       crashLock = 0.8;
       respawnAtCheckpoint();
-      Taunt.push('原地复位。路还在原地。');
+      Taunt.push('从头开始。路不记得你。');
     }
   });
 })();
