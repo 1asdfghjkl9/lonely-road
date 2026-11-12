@@ -1,0 +1,2113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>孤独的公路 · Lonely Highway</title>
+<style>
+  :root{
+    --ink:#ece9e3;
+    --dim:#8d8b86;
+    --line:rgba(236,233,227,.14);
+    --accent:#e0592e;
+    --panel:rgba(8,10,14,.72);
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{
+    width:100%; height:100%; overflow:hidden; background:#05070a; color:var(--ink);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  canvas{ display:block; width:100%; height:100%; }
+
+  #hud{ position:fixed; inset:0; pointer-events:none; font-variant-numeric:tabular-nums; }
+
+  .hud-top{
+    position:absolute; top:0; left:0; right:0; padding:22px 26px;
+    display:flex; justify-content:space-between; align-items:flex-start; gap:20px;
+  }
+  .hud-level{ font-size:13px; letter-spacing:.22em; color:var(--dim); }
+  .hud-level b{ display:block; margin-top:6px; font-size:20px; letter-spacing:.06em; color:var(--ink); font-weight:600; }
+  .hud-right{ text-align:right; font-size:12px; color:var(--dim); line-height:1.9; letter-spacing:.05em; }
+  .hud-right kbd{
+    display:inline-block; min-width:20px; padding:1px 5px; margin:0 2px;
+    border:1px solid var(--line); border-radius:3px; font-size:11px; color:#c9c6bf;
+    font-family:inherit;
+  }
+
+  .hud-bottom{
+    position:absolute; left:0; right:0; bottom:0; padding:0 26px 24px;
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+  }
+  .speedo{ display:flex; align-items:baseline; gap:8px; }
+  .speedo .num{ font-size:56px; line-height:.9; font-weight:300; letter-spacing:-.02em; }
+  .speedo .unit{ font-size:12px; letter-spacing:.2em; color:var(--dim); }
+
+  .progress{ flex:1; max-width:520px; }
+  .progress .label{ display:flex; justify-content:space-between; font-size:12px; color:var(--dim); letter-spacing:.1em; margin-bottom:8px; }
+  .bar{ height:2px; background:rgba(236,233,227,.12); position:relative; overflow:hidden; }
+  .bar > i{ position:absolute; inset:0 auto 0 0; width:0%; background:var(--ink); transition:width .18s linear; }
+
+  .rage{ width:180px; text-align:right; }
+  .rage .label{ font-size:12px; color:var(--dim); letter-spacing:.1em; margin-bottom:8px; }
+  .rage .bar > i{ background:var(--accent); }
+
+  #toasts{
+    position:fixed; left:26px; bottom:120px; width:min(360px,60vw);
+    display:flex; flex-direction:column-reverse; gap:8px; pointer-events:none;
+  }
+  .toast{
+    padding:11px 15px; font-size:14px; line-height:1.55; color:#d8d5ce;
+    background:var(--panel); border-left:2px solid var(--accent);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    opacity:0; transform:translateY(8px);
+    transition:opacity .4s ease, transform .4s ease;
+  }
+  .toast.on{ opacity:1; transform:none; }
+
+  .center-card{
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; gap:14px;
+    pointer-events:none; transition:opacity .8s ease;
+  }
+  .center-card .big{ font-size:clamp(30px,5vw,58px); font-weight:200; letter-spacing:.18em; }
+  .center-card .small{ font-size:14px; letter-spacing:.3em; color:var(--dim); }
+  .fade-out{ opacity:0; }
+
+  #ending{
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    padding:8vh 6vw; pointer-events:none;
+    transition:opacity 1.2s ease;
+  }
+  #ending .t1{ font-size:clamp(44px,9vw,110px); font-weight:200; letter-spacing:.4em; text-indent:.4em; }
+  #ending .t2{ margin-top:34px; font-size:clamp(15px,2.2vw,24px); letter-spacing:.08em; color:#d9d6cf; font-weight:300; }
+  #ending .t2s{ margin-top:12px; font-size:clamp(12px,1.6vw,16px); letter-spacing:.06em; color:#b9a08f; }
+  #ending .t3{ margin-top:44px; font-size:clamp(11px,1.4vw,14px); letter-spacing:.1em; color:#7d7b76; line-height:2.1; }
+  #ending .t4{ margin-top:52px; font-size:clamp(13px,1.6vw,17px); letter-spacing:.16em; color:#cfccc5; }
+  #ending .t5{ margin-top:16px; font-size:11px; letter-spacing:.34em; color:#5c5a56; }
+  .rev{ opacity:0; transform:translateY(10px); transition:opacity 1.4s ease, transform 1.4s ease; }
+  .rev.on{ opacity:1; transform:none; }
+
+  #again{
+    position:fixed; left:50%; bottom:12vh; transform:translateX(-50%);
+    padding:14px 42px; background:transparent; color:var(--ink);
+    border:1px solid rgba(236,233,227,.35); border-radius:2px;
+    font-family:inherit; font-size:14px; letter-spacing:.28em; cursor:pointer;
+    opacity:0; pointer-events:none; transition:opacity 1s ease, background .25s ease, border-color .25s ease;
+  }
+  #again.on{ opacity:1; pointer-events:auto; }
+  #again:hover{ background:rgba(236,233,227,.08); border-color:rgba(236,233,227,.6); }
+
+  #boot{
+    position:fixed; inset:0; background:#05070a; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    transition:opacity .7s ease; z-index:50;
+  }
+  #boot .bt{ font-size:26px; letter-spacing:.42em; text-indent:.42em; font-weight:200; }
+  #boot .bm{ font-size:12px; letter-spacing:.22em; color:var(--dim); }
+  #boot .err{ font-size:13px; color:#c9603c; max-width:520px; text-align:center; line-height:1.8; }
+
+  .hidden{ display:none !important; }
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+  }
+  .dimline{ position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, transparent 40%, rgba(0,0,0,.55) 100%); }
+
+  @media (max-width:760px){
+    .hud-top{ padding:14px 16px; }
+    .hud-right{ display:none; }
+    .hud-bottom{ padding:0 16px 16px; flex-wrap:wrap; }
+    .speedo .num{ font-size:38px; }
+    .rage{ width:120px; }
+    #toasts{ left:16px; bottom:150px; width:min(320px,72vw); }
+  }
+  @media print{ body{ background:#fff; color:#000; } canvas{ display:none; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<h1 class="sr-only">孤独的公路 · 网页 3D 赛车游戏原型</h1>
+<div class="dimline"></div>
+
+<div id="hud">
+  <div class="hud-top">
+    <div class="hud-level">
+      孤独的公路 · LONELY HIGHWAY
+      <b id="levelName">第一关 · 直道</b>
+    </div>
+    <div class="hud-right">
+      <kbd>W</kbd><kbd>↑</kbd> 油门　<kbd>S</kbd><kbd>↓</kbd> 刹车<br>
+      <kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> 转向　<kbd>空格</kbd> 手刹<br>
+      <kbd>R</kbd> 回检查点
+    </div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="speedo">
+      <span class="num" id="spd">0</span>
+      <span class="unit">KM/H</span>
+    </div>
+    <div class="progress" id="progressWrap">
+      <div class="label"><span id="progLabel">弯道</span><span id="progVal">0 / 200</span></div>
+      <div class="bar"><i id="progBar"></i></div>
+    </div>
+    <div class="rage" id="rageWrap">
+      <div class="label">暴躁值 <span id="rageVal">0</span></div>
+      <div class="bar"><i id="rageBar"></i></div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="titleCard" class="center-card hidden">
+  <div class="big" id="tcBig">第一关 · 直道</div>
+  <div class="small" id="tcSmall">请直走</div>
+</div>
+
+<div id="ending" class="hidden">
+  <div class="t1 rev" id="e1">通关</div>
+  <div class="t2 rev" id="e2"></div>
+  <div class="t2s rev" id="e2s"></div>
+  <div class="t3 rev" id="e3"></div>
+  <div class="t4 rev" id="e4">裴谦对这个结果很满意。</div>
+  <div class="t5 rev" id="e5">按任意键</div>
+</div>
+
+<button id="again">再来一次</button>
+
+<div id="boot">
+  <div class="bt">孤独的公路</div>
+  <div class="bm" id="bootMsg">正在加载…</div>
+</div>
+
+<script type="module">
+/* =========================================================================
+   《孤独的公路》 Lonely Highway
+   Three.js + Rapier3D  ·  单文件原型
+   -------------------------------------------------------------------------
+   调参入口：搜索 "CONFIG" —— 所有反人类手感参数都集中在那一块。
+   ========================================================================= */
+
+/* ------------------------- 0. 依赖加载（多 CDN 兜底） ------------------------- */
+async function importFirst(urls){
+  let lastErr;
+  for (const u of urls){
+    try { return await import(/* @vite-ignore */ u); }
+    catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('module load failed');
+}
+
+/* ------------------------------- 1. 调参区 -------------------------------- */
+const CONFIG = {
+  /* --- 世界 --- */
+  world: {
+    gravity: -19.0,        // 重力加速度（越大越沉，翻车越干脆）
+    fixedStep: 1 / 60,     // 物理固定步长
+    maxSubSteps: 4
+  },
+
+  /* --- 车 --- */
+  car: {
+    mass: 1150,
+    half: { x: 0.92, y: 0.36, z: 2.02 },   // 碰撞盒半尺寸；y 别调大，否则上坡时底盘会插进路面被卡死
+    colliderYOffset: 0,                    // 碰撞盒相对车身原点的 Y 偏移（0 = 质心与原点重合，力矩计算最稳）
+    wheel: {
+      x: 0.88, y: -0.34, z: 1.38,          // 四轮挂点（相对车身）
+      radius: 0.36,
+      rest: 0.34,                          // 悬挂自然长度
+      stiffness: 36000,                    // 弹簧刚度 N/m
+      damping: 3400                        // 阻尼 N·s/m
+    },
+    engineForce: 9000,                     // 发动机推力（牛）；太大会抬车头翻车
+    brakeForce: 15000,                     // 刹车力
+    dragCoef: 3.4,                         // 空气阻力系数（决定极速）
+    maxSteer: 0.62,                        // 低速最大前轮转角（弧度）
+    steerSpeedFalloff: 0.048,              // 速度对转角的衰减
+    gripNormal: 0.58,                      // 正常横向抓地（摩擦圆系数 μ，越大越黏）
+    gripHandbrake: 0.10,                   // 手刹抓地
+    rollCenter: 0.30,                      // 侧向力作用点距路面高度，越小越不容易翻车
+  },
+
+  /* --- 反人类手感（第二关核心） --- */
+  hell: {
+    steerDelay: 0.20,        // ★ 转向响应延迟（秒）：你打方向，车 0.2 秒后才理你
+    uphillSteerPenalty: 0.72,// ★ 上坡时转向力衰减比例（爬坡方向盘变哑）
+    gravitySteerPull: 2.6,   // ★ 重力对车头的横向拉扯强度（上下坡都会拽偏）
+    downhillGripLoss: 0.42,  // ★ 下坡刹车时额外损失的抓地（打滑）
+    downhillBrakeLoss: 0.45, // ★ 下坡时刹车效能折损
+    potholeSpeedSafe: 11,    // 低于这个速度过坑只是颠一下
+    potholeSpeedFlip: 24,    // 高于这个速度过坑大概率翻
+    potholeImpulse: 5200,    // 过坑冲击力
+    crashDeltaV: 9.5,        // 单帧速度突变超过这个值判定为撞击
+    flipUpDot: 0.30,         // 车顶朝上分量低于此值算翻车
+    flipHold: 0.55,          // 持续多少秒判定翻车
+    offRoadMargin: 0.35       // 超出路面边缘多少米算冲出公路
+  },
+
+  /* --- 赛制 --- */
+  race: {
+    targetCorners: 200,      // ★ 通关所需弯道数
+    checkpointEvery: 8,      // ★ 检查点间隔（弯道数）—— 故意拉大
+    cornerRadiusMin: 13,     // 最小弯道半径；必须明显大于半路宽，否则路面会自己折起来
+    cornerRadiusMax: 42
+  },
+
+  /* --- 暴躁值 --- */
+  rage: {
+    perCrash: 15,
+    perFlip: 22,
+    decayPerSec: 3.4,        // 无失误时的自然消退
+    max: 100,
+    crashSensitivity: 0.45,  // 暴躁值满时撞击判定阈值收紧的比例
+    gripPenalty: 0.22,       // 暴躁值满时抓地损失
+    delayPenalty: 0.06       // 暴躁值满时转向延迟额外增加（秒）
+  },
+
+  /* --- 嘲讽 --- */
+  taunt: {
+    duration: 3.0,           // 每条停留 3 秒
+    minGap: 2.0,             // 两条之间最小间隔
+    idleSec: 10              // 静止/无操作多久触发"你在等什么"
+  },
+
+  /* --- 赛道 --- */
+  track: {
+    halfWidth: 6.2,          // 半路宽（米）
+    sample: 2.5,             // 路面采样间距
+    seed: 20261112,
+    colliderExtra: 0.8       // 物理地面比视觉路面宽出的米数（留一点路肩，别让车身骑在边线上被勾住）
+  }
+};
+
+/* ------------------------------- 2. 小工具 -------------------------------- */
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const UP    = { x:0, y:1, z:0 };
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* =============================== 主程序 =================================== */
+(async function boot(){
+  const bootEl  = document.getElementById('boot');
+  const bootMsg = document.getElementById('bootMsg');
+
+  let THREE, RAPIER;
+  try{
+    bootMsg.textContent = '正在加载渲染引擎…';
+    THREE = await importFirst([
+      'https://unpkg.com/three@0.161.0/build/three.module.js',
+      'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js',
+      'https://esm.sh/three@0.161.0'
+    ]);
+    bootMsg.textContent = '正在加载物理引擎…';
+    const rapierMod = await importFirst([
+      'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.js',
+      'https://unpkg.com/@dimforge/rapier3d-compat@0.12.0/rapier.es.js',
+      'https://esm.sh/@dimforge/rapier3d-compat@0.12.0'
+    ]);
+    RAPIER = (rapierMod.default && typeof rapierMod.default.init === 'function')
+      ? rapierMod.default : rapierMod;
+    await RAPIER.init();
+  }catch(err){
+    bootEl.innerHTML = '<div class="bt">加载失败</div>' +
+      '<div class="err">无法从 CDN 获取 Three.js / Rapier。<br>请检查网络后刷新页面。<br><br>' +
+      String(err && err.message || err) + '</div>';
+    return;
+  }
+
+  /* ---------------------------- 3. 渲染基础 ---------------------------- */
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 900);
+  camera.position.set(0, 6, -10);
+
+  const endScene = new THREE.Scene();
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  });
+
+  /* ---------------------------- 4. 光照 ---------------------------- */
+  const hemi = new THREE.HemisphereLight(0x9fc0e8, 0x1a1a18, 0.85);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff2dd, 1.05);
+  sun.position.set(-60, 90, 40);
+  scene.add(sun);
+  scene.add(new THREE.AmbientLight(0x334055, 0.35));
+
+  // 车头灯（第二关夜景）
+  const headL = new THREE.SpotLight(0xfff0cc, 0, 90, 0.62, 0.72, 1.1);
+  const headR = new THREE.SpotLight(0xfff0cc, 0, 90, 0.62, 0.72, 1.1);
+  scene.add(headL, headL.target, headR, headR.target);
+
+  /* ---------------------------- 5. 物理世界 ---------------------------- */
+  const world = new RAPIER.World({ x:0, y:CONFIG.world.gravity, z:0 });
+  world.timestep = CONFIG.world.fixedStep;
+
+  /* ---------------------------- 6. 赛道生成 ---------------------------- */
+  // 状态机：直线 / 弯道，逐点推进，同时记录每个弯的顶点位置
+  function generateTrack(cornerTarget, seed){
+    const rand = mulberry32(seed);
+    const ctrl = [];              // Spline 控制点
+    const apexes = [];            // 每个弯的顶点（世界坐标）
+    const pos = new THREE.Vector3(0,0,0);
+    let heading = 0;              // 朝向角：forward = (sin h, 0, cos h)
+    const dirV = () => new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+
+    ctrl.push(pos.clone());
+
+    function step(len, dy){
+      const d = dirV().multiplyScalar(len);
+      pos.x += d.x; pos.z += d.z; pos.y += dy;
+      ctrl.push(pos.clone());
+    }
+    // 高度软限位：接近上下限时自动收敛，避免出现垂直断崖
+    function clampDy(dy){
+      if (!dy) return 0;
+      const room = dy > 0 ? (78 - pos.y) : (pos.y + 26);
+      if (room <= 1) return -dy * 0.6;
+      return Math.sign(dy) * Math.min(Math.abs(dy), room * 0.85);
+    }
+    function straight(len, dy = 0, stepLen = 9){
+      // 限制最大坡度 20%：太陡的话车爬不上去，底盘也会蹭地
+      dy = clamp(dy, -len * 0.20, len * 0.20);
+      dy = clampDy(dy);
+      const n = Math.max(1, Math.round(len/stepLen));
+      for (let i=0;i<n;i++) step(len/n, dy/n);
+    }
+    function corner(angleDeg, radius, dy = 0){
+      // 半径统一受 CONFIG.race 约束：半径小于半路宽时，路面内侧会自己折起来
+      radius = clamp(radius, CONFIG.race.cornerRadiusMin, CONFIG.race.cornerRadiusMax);
+      const arcLen = Math.abs(angleDeg) * Math.PI / 180 * radius;
+      dy = clamp(dy, -arcLen * 0.20, arcLen * 0.20);
+      dy = clampDy(dy);
+      const a = angleDeg * Math.PI/180;
+      const n = Math.max(4, Math.ceil(Math.abs(a) * radius / 6));
+      const dth = a/n;
+      const stepLen = 2 * radius * Math.sin(Math.abs(dth)/2);
+      const y0 = pos.y;
+      for (let i=1;i<=n;i++){
+        heading += dth;
+        step(stepLen, 0);
+        pos.y = y0 + dy * (i/n);
+        ctrl[ctrl.length-1].y = pos.y;
+        if (i === Math.floor(n/2)) apexes.push(pos.clone());
+      }
+    }
+    // 让赛道大致朝前，避免无限绕圈自交
+    function pickDir(){
+      if (heading >  1.55) return -1;
+      if (heading < -1.55) return  1;
+      return rand() < 0.5 ? 1 : -1;
+    }
+    function elev(max){ return (rand()<0.5?-1:1) * (3 + rand()*max); }
+
+    // ---- 自交保护 ----------------------------------------------------
+    // 赛道是随机生成的，很容易"绕回来压到自己身上"：两段路面在平面上重叠，
+    // 车就会开到一个本不该存在的路面上，或者被两段三角网夹住卡死。
+    // 这里用一张空间网格记录"至少 10 个控制点以前"的路面，新路段离它太近就重掷。
+    const MIN_SEP = CONFIG.track.halfWidth * 2 + 2;
+    const LAG = 6;      // 只和"6 个控制点以前"的路面比较，否则自己这段就会被自己挡住
+    const cellSz = MIN_SEP;
+    const grid = new Map();
+    const keyOf = (x, z) => `${Math.floor(x/cellSz)},${Math.floor(z/cellSz)}`;
+    let gridFilled = 0;
+    function fillGrid(){
+      const upto = Math.max(0, ctrl.length - LAG);
+      for (; gridFilled < upto; gridFilled++){
+        const q = ctrl[gridFilled];
+        const k = keyOf(q.x, q.z);
+        let a = grid.get(k);
+        if (!a){ a = []; grid.set(k, a); }
+        a.push(q);
+      }
+    }
+    // 注意：网格必须在"生成这一段之前"填好。
+    // 如果等生成完再填，这一段自己的点就会被塞进网格，然后自己挡自己，永远冲突。
+    function segConflict(from){
+      const m2 = MIN_SEP * MIN_SEP;
+      for (let i = from; i < ctrl.length; i++){
+        const p = ctrl[i];
+        const cx = Math.floor(p.x/cellSz), cz = Math.floor(p.z/cellSz);
+        for (let a=-1;a<=1;a++) for (let b=-1;b<=1;b++){
+          const arr = grid.get(`${cx+a},${cz+b}`);
+          if (!arr) continue;
+          for (let k=0;k<arr.length;k++){
+            const q = arr[k];
+            const dx = p.x-q.x, dz = p.z-q.z;
+            // 平面上挨得近、高度也接近，才算"叠在一起"；
+            // 上下层立体交叉（高差 4 米以上）是允许的，那是立交桥。
+            if (dx*dx + dz*dz < m2 && Math.abs(p.y - q.y) < 3.2) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    straight(70);                       // 起步直道
+    let count = 0;
+    let guard = 0;
+
+    // 生成"一段"路（一个随机分支），返回值之外只做副作用
+    function buildOne(){
+      const r = rand();
+      if (r < 0.30){
+        // 单弯
+        corner((38 + rand()*52) * pickDir(), 20 + rand()*20, elev(7));
+        count++;
+        straight(26 + rand()*34);
+      } else if (r < 0.50){
+        // S 弯：连续三个反向弯
+        let d = pickDir();
+        for (let i=0;i<3 && count<cornerTarget;i++){
+          corner((42 + rand()*42) * d, 19 + rand()*15, elev(5));
+          count++;
+          d = -d;
+          straight(13 + rand()*13);
+        }
+        straight(30 + rand()*26);
+      } else if (r < 0.66){
+        // 发卡弯
+        corner((148 + rand()*38) * pickDir(), 9 + rand()*6, elev(4));
+        count++;
+        straight(28 + rand()*28);
+      } else if (r < 0.84){
+        // 陡坡 + 急弯组合
+        straight(28 + rand()*18, (rand()<0.5?1:-1) * (6 + rand()*5));
+        corner((62 + rand()*48) * pickDir(), 12 + rand()*10, 0);
+        count++;
+        straight(26 + rand()*18, -(5 + rand()*6));
+      } else {
+        // 盲弯：长直道后突然一个急弯
+        straight(72 + rand()*46);
+        corner((82 + rand()*40) * pickDir(), 11 + rand()*8, elev(6));
+        count++;
+        straight(28 + rand()*24);
+      }
+    }
+
+    while (count < cornerTarget && guard++ < 4000){
+      let ok = false;
+      for (let attempt = 0; attempt < 8 && !ok; attempt++){
+        const snapPos = pos.clone();
+        const snapHead = heading;
+        const snapLen = ctrl.length;
+        const snapApex = apexes.length;
+        const snapCount = count;
+        fillGrid();
+        buildOne();
+        if (!segConflict(snapLen)){ ok = true; }
+        else {
+          pos.copy(snapPos); heading = snapHead;
+          ctrl.length = snapLen; apexes.length = snapApex;
+          count = snapCount;
+          grid.clear(); gridFilled = 0;      // 网格要跟着回滚，否则会把废掉的路段当成障碍
+        }
+      }
+      if (!ok){
+        // 八个方向都放不下：先往前开一段，把位置挪开再继续
+        const before = ctrl.length;
+        fillGrid();
+        straight(90);
+        if (segConflict(before)){ ctrl.length = before; }
+      }
+      // 高度软限制，别飞到天上去
+      if (pos.y > 78) pos.y = 78;
+      if (pos.y < -26) pos.y = -26;
+    }
+    return { ctrl, apexes };
+  }
+
+  // 控制点 → Spline → 等距采样点
+  // 自交检测：采样点之间（相隔 40 个点以上的）最小平面距离。
+  // 小于一个路宽就会两段路面叠在一起，车会开到"不该存在的路面"上。
+  function minSelfSeparation(pts, cell = 20){
+    const map = new Map();
+    let best = Infinity;
+    for (let i=0;i<pts.length;i++){
+      const p = pts[i];
+      const cx = Math.floor(p.x/cell), cz = Math.floor(p.z/cell);
+      for (let a=-1;a<=1;a++) for (let b=-1;b<=1;b++){
+        const arr = map.get(`${cx+a},${cz+b}`);
+        if (!arr) continue;
+        for (let k=0;k<arr.length;k++){
+          const q = arr[k];
+          if (i - q.i <= 40) continue;
+          if (Math.abs(p.y - q.p.y) >= 3.2) continue;   // 立体交叉不算重叠
+          const dx = p.x-q.p.x, dz = p.z-q.p.z;
+          const d2 = dx*dx+dz*dz;
+          if (d2 < best) best = d2;
+        }
+      }
+      const key = `${cx},${cz}`;
+      let arr = map.get(key);
+      if (!arr){ arr = []; map.set(key, arr); }
+      arr.push({ i, p });
+    }
+    return Math.sqrt(best);
+  }
+
+  function sampleSpline(ctrl, spacing){
+    const curve = new THREE.CatmullRomCurve3(ctrl, false, 'centripetal', 0.5);
+    const raw = curve.getPoints(Math.min(24000, ctrl.length * 4));
+    const out = [raw[0].clone()];
+    let prev = raw[0].clone();
+    let acc = 0;
+    for (let i=1;i<raw.length;i++){
+      const cur = raw[i];
+      const seg = new THREE.Vector3().subVectors(cur, prev);
+      const len = seg.length();
+      if (len < 1e-6){ prev = cur; continue; }
+      const dirv = seg.clone().divideScalar(len);
+      let t = 0;
+      while (acc + (len - t) >= spacing){
+        t += spacing - acc;
+        out.push(prev.clone().addScaledVector(dirv, t));
+        acc = 0;
+      }
+      acc += len - t;
+      prev = cur;
+    }
+    if (out.length < 2) out.push(raw[raw.length-1].clone());
+    return out;
+  }
+
+  // 为路径点计算切线 / 右向 / 法线 / 坡度
+  function buildPathData(pts){
+    const n = pts.length;
+    const tangents = [], rights = [], normals = [], slopes = [];
+    const T = new THREE.Vector3(), R = new THREE.Vector3(), N = new THREE.Vector3();
+    for (let i=0;i<n;i++){
+      const a = pts[Math.max(0,i-1)], b = pts[Math.min(n-1,i+1)];
+      T.subVectors(b,a).normalize();
+      R.crossVectors(new THREE.Vector3(0,1,0), T).normalize();
+      N.crossVectors(T, R).normalize();
+      tangents.push(T.clone());
+      rights.push(R.clone());
+      normals.push(N.clone());
+      const horiz = Math.hypot(T.x, T.z) || 1e-4;
+      slopes.push(T.y / horiz);
+    }
+    return { pts, tangents, rights, normals, slopes, n };
+  }
+
+  // 把弯道顶点映射到采样点索引
+  function mapApexes(pts, apexes){
+    const idx = [];
+    for (const ap of apexes){
+      let best = 0, bd = Infinity;
+      for (let i=0;i<pts.length;i++){
+        const dx = pts[i].x - ap.x, dz = pts[i].z - ap.z;
+        const d = dx*dx + dz*dz;
+        if (d < bd){ bd = d; best = i; }
+      }
+      idx.push(best);
+    }
+    idx.sort((a,b)=>a-b);
+    return idx;
+  }
+
+  /* ---------------------------- 7. 路面网格 ---------------------------- */
+  function buildRoad(pd, halfWidth, group){
+    const pts = pd.pts, n = pts.length;
+    const verts = new Float32Array(n*2*3);
+    const uvs   = new Float32Array(n*2*2);
+    const idx   = new Uint32Array((n-1)*6);
+    const rightV = new THREE.Vector3();
+
+    for (let i=0;i<n;i++){
+      const p = pts[i];
+      rightV.copy(pd.rights[i]).multiplyScalar(halfWidth);
+      const lx = p.x - rightV.x, lz = p.z - rightV.z;
+      const rx = p.x + rightV.x, rz = p.z + rightV.z;
+      const o = i*6;
+      verts[o  ] = lx; verts[o+1] = p.y; verts[o+2] = lz;
+      verts[o+3] = rx; verts[o+4] = p.y; verts[o+5] = rz;
+      const u = i*4;
+      uvs[u  ] = 0; uvs[u+1] = i*0.25;
+      uvs[u+2] = 1; uvs[u+3] = i*0.25;
+    }
+    for (let i=0;i<n-1;i++){
+      const b = i*2, o = i*6;
+      idx[o  ] = b;   idx[o+1] = b+2; idx[o+2] = b+1;
+      idx[o+3] = b+1; idx[o+4] = b+2; idx[o+5] = b+3;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x1c1e22, roughness: 0.96, metalness: 0.02
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.frustumCulled = false;
+    group.add(mesh);
+
+    // 物理三角网：比视觉路面更宽（左右各多 colliderExtra 米）。
+    // 否则车身一旦骑在路面边缘，底盘碰撞盒会勾住三角网的边，直接卡死在那儿。
+    const cw = halfWidth + CONFIG.track.colliderExtra;
+    const cverts = new Float32Array(n*2*3);
+    for (let i=0;i<n;i++){
+      const p = pts[i];
+      rightV.copy(pd.rights[i]).multiplyScalar(cw);
+      const o = i*6;
+      cverts[o  ] = p.x - rightV.x; cverts[o+1] = p.y; cverts[o+2] = p.z - rightV.z;
+      cverts[o+3] = p.x + rightV.x; cverts[o+4] = p.y; cverts[o+5] = p.z + rightV.z;
+    }
+    const triDesc = RAPIER.ColliderDesc.trimesh(cverts, idx)
+      .setFriction(0.9).setRestitution(0.05);
+    const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    world.createCollider(triDesc, body);
+
+    return { mesh, body, verts, idx };
+  }
+
+  // 中心虚线
+  function buildDashes(pd, group){
+    const pts = pd.pts;
+    const pos = [], ind = [];
+    let v = 0;
+    const w = 0.09;
+    for (let i=0;i<pts.length-2;i+=4){
+      const a = pts[i], b = pts[Math.min(pts.length-1, i+1)];
+      const r = pd.rights[i];
+      const y = 0.015;
+      const ax = a.x - r.x*w, az = a.z - r.z*w;
+      const bx = a.x + r.x*w, bz = a.z + r.z*w;
+      const cx = b.x + r.x*w, cz = b.z + r.z*w;
+      const dx = b.x - r.x*w, dz = b.z - r.z*w;
+      pos.push(ax,a.y+y,az, bx,a.y+y,bz, cx,b.y+y,cz, dx,b.y+y,dz);
+      ind.push(v, v+2, v+1, v+1, v+2, v+3);
+      v += 4;
+    }
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(ind);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xd8d2bd, transparent:true, opacity:0.55 }));
+    m.frustumCulled = false;
+    group.add(m);
+  }
+
+  // 路肩白线
+  function buildEdgeLines(pd, halfWidth, group){
+    for (const side of [-1, 1]){
+      const pos = [], ind = [];
+      let v = 0;
+      const off = side * (halfWidth - 0.45);
+      const w = 0.10;
+      for (let i=0;i<pd.pts.length-1;i++){
+        const a = pd.pts[i], b = pd.pts[i+1];
+        const ra = pd.rights[i], rb = pd.rights[i+1];
+        const ax1 = a.x + ra.x*(off-w), az1 = a.z + ra.z*(off-w);
+        const ax2 = a.x + ra.x*(off+w), az2 = a.z + ra.z*(off+w);
+        const bx2 = b.x + rb.x*(off+w), bz2 = b.z + rb.z*(off+w);
+        const bx1 = b.x + rb.x*(off-w), bz1 = b.z + rb.z*(off-w);
+        pos.push(ax1,a.y+0.012,az1, ax2,a.y+0.012,az2, bx2,b.y+0.012,bz2, bx1,b.y+0.012,bz1);
+        ind.push(v, v+2, v+1, v+1, v+2, v+3);
+        v += 4;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(ind);
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xbdb7a4, transparent:true, opacity:0.42 }));
+      m.frustumCulled = false;
+      group.add(m);
+    }
+  }
+
+  // 路灯（实例化）
+  function buildLamps(pd, group, spacingM){
+    const step = Math.max(2, Math.round(spacingM / CONFIG.track.sample));
+    const spots = [];
+    for (let i = 20; i < pd.pts.length - 20; i += step){
+      const p = pd.pts[i], r = pd.rights[i];
+      spots.push({ p, r });
+    }
+    if (spots.length === 0) return;
+    const poleGeo = new THREE.CylinderGeometry(0.09, 0.13, 7.2, 6);
+    const poleMat = new THREE.MeshStandardMaterial({ color:0x2b2e33, roughness:0.8, metalness:0.4 });
+    const poles = new THREE.InstancedMesh(poleGeo, poleMat, spots.length);
+
+    const headGeo = new THREE.SphereGeometry(0.28, 8, 6);
+    const headMat = new THREE.MeshBasicMaterial({ color:0xffd9a0 });
+    const heads = new THREE.InstancedMesh(headGeo, headMat, spots.length);
+
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    spots.forEach((s, k)=>{
+      const bx = s.p.x + s.r.x * 7.2;
+      const bz = s.p.z + s.r.z * 7.2;
+      m.compose(new THREE.Vector3(bx, s.p.y + 3.6, bz), q, new THREE.Vector3(1,1,1));
+      poles.setMatrixAt(k, m);
+      m.compose(new THREE.Vector3(bx, s.p.y + 7.3, bz), q, new THREE.Vector3(1,1,1));
+      heads.setMatrixAt(k, m);
+    });
+    poles.instanceMatrix.needsUpdate = true;
+    heads.instanceMatrix.needsUpdate = true;
+    group.add(poles, heads);
+  }
+
+  /* ---------------------------- 8. 车辆 ---------------------------- */
+  function buildCarVisual(){
+    const g = new THREE.Group();
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color:0x8f2b1f, roughness:0.42, metalness:0.55 });
+    const darkMat = new THREE.MeshStandardMaterial({ color:0x14161a, roughness:0.85, metalness:0.1 });
+    const glassMat = new THREE.MeshStandardMaterial({ color:0x0a1018, roughness:0.15, metalness:0.9 });
+
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.62, 4.0), bodyMat);
+    lower.position.y = -0.06;
+    g.add(lower);
+
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.52, 2.0), glassMat);
+    cabin.position.set(0, 0.48, -0.15);
+    g.add(cabin);
+
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 1.5), bodyMat);
+    roof.position.set(0, 0.76, -0.2);
+    g.add(roof);
+
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.26, 0.5), bodyMat);
+    nose.position.set(0, -0.16, 2.1);
+    g.add(nose);
+
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(1.76, 0.18, 0.16), new THREE.MeshStandardMaterial({
+      color:0x5a0f0a, emissive:0x8b1a0e, emissiveIntensity:0.9, roughness:0.6
+    }));
+    tail.position.set(0, 0.02, -2.03);
+    g.add(tail);
+
+    // 轮子
+    const wheelGeo = new THREE.CylinderGeometry(CONFIG.car.wheel.radius, CONFIG.car.wheel.radius, 0.28, 14);
+    wheelGeo.rotateZ(Math.PI/2);
+    const wheels = [];
+    const wc = CONFIG.car.wheel;
+    // 静止悬挂长度：把轮子放在"已经落地"的位置，而不是硬贴在车身上
+    const comp0 = (CONFIG.car.mass * Math.abs(CONFIG.world.gravity) / 4) / wc.stiffness;
+    const L0 = Math.max(0.04, wc.rest - comp0);
+    const corners = [
+      [-wc.x, wc.y,  wc.z, true ],
+      [ wc.x, wc.y,  wc.z, true ],
+      [-wc.x, wc.y, -wc.z, false],
+      [ wc.x, wc.y, -wc.z, false]
+    ];
+    for (const [x,y,z,front] of corners){
+      const pivot = new THREE.Group();
+      pivot.position.set(x, y - L0, z);
+      const w = new THREE.Mesh(wheelGeo, darkMat);
+      pivot.add(w);
+      g.add(pivot);
+      wheels.push({ pivot, mesh:w, front });
+    }
+
+    // 车头灯外壳
+    const lampGeo = new THREE.BoxGeometry(0.34, 0.14, 0.06);
+    const lampMat = new THREE.MeshBasicMaterial({ color:0xfff2cf });
+    for (const sx of [-0.62, 0.62]){
+      const l = new THREE.Mesh(lampGeo, lampMat);
+      l.position.set(sx, -0.1, 2.36);
+      g.add(l);
+    }
+
+    return { group:g, wheels };
+  }
+
+  const carVisual = buildCarVisual();
+  // 车身在路面上静止时的高度（结算画面里把车"停在路边"要用）
+  const CAR_REST_Y = CONFIG.car.wheel.radius
+    + (CONFIG.car.wheel.rest - (CONFIG.car.mass * Math.abs(CONFIG.world.gravity) / 4) / CONFIG.car.wheel.stiffness)
+    - CONFIG.car.wheel.y;
+  scene.add(carVisual.group);
+
+  // 物理车身
+  let chassisBody = null;
+  function createChassis(){
+    if (chassisBody) { world.removeRigidBody(chassisBody); chassisBody = null; }
+    const h = CONFIG.car.half;
+    const desc = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(0, 40, 0)
+      .setLinearDamping(0.08)
+      .setAngularDamping(0.55)
+      .setCanSleep(false);
+    const body = world.createRigidBody(desc);
+    const volume = (h.x*2)*(h.y*2)*(h.z*2);
+    const density = CONFIG.car.mass / volume;
+    const col = RAPIER.ColliderDesc.cuboid(h.x, h.y, h.z)
+      .setDensity(density)
+      .setFriction(0.5)
+      .setRestitution(0.08)
+      .setTranslation(0, CONFIG.car.colliderYOffset, 0);
+    world.createCollider(col, body);
+    chassisBody = body;
+    return body;
+  }
+  createChassis();
+
+  /* ---------------------------- 9. 赛道对象 ---------------------------- */
+  let track = null;         // { pd, group, roadBody, cornerPathIdx, apexes }
+  let trackGroup = null;
+
+  function disposeTrack(){
+    if (trackGroup){
+      scene.remove(trackGroup);
+      trackGroup.traverse(o=>{
+        if (o.geometry) o.geometry.dispose();
+        if (o.material){
+          if (Array.isArray(o.material)) o.material.forEach(m=>m.dispose());
+          else o.material.dispose();
+        }
+      });
+      trackGroup = null;
+    }
+    if (track && track.roadBody){ world.removeRigidBody(track.roadBody); }
+    track = null;
+  }
+
+  function installTrack(pd, cornerPathIdx){
+    disposeTrack();
+    trackGroup = new THREE.Group();
+    scene.add(trackGroup);
+    const road = buildRoad(pd, CONFIG.track.halfWidth, trackGroup);
+    buildDashes(pd, trackGroup);
+    buildEdgeLines(pd, CONFIG.track.halfWidth, trackGroup);
+    buildLamps(pd, trackGroup, 55);
+    track = {
+      pd,
+      group: trackGroup,
+      roadBody: road.body,
+      cornerPathIdx,
+      checkpoints: []
+    };
+    // 检查点：每 checkpointEvery 个弯一个
+    const every = CONFIG.race.checkpointEvery;
+    for (let c = 0; c < cornerPathIdx.length; c += every) track.checkpoints.push(c);
+    if (track.checkpoints.length === 0) track.checkpoints.push(0);
+  }
+
+  /* ---------------------------- 10. 游戏状态 ---------------------------- */
+  const State = { TITLE:0, L1:1, L2:2, ENDING:3, DONE:4 };
+  let state = State.TITLE;
+
+  const game = {
+    playTime: 0,          // 真实计时（秒）
+    cornersPassed: 0,
+    cornerPointer: 0,
+    progressIdx: 0,
+    lastCheckpointCorner: 0,
+    rage: 0,
+    crashes: 0,
+    flips: 0,
+    cornerFlips: new Map(),   // 弯道索引 -> 翻车次数
+    longestCorner: 0,         // 卡最久的弯
+    longestCornerTime: 0,
+    cornerEnterTime: 0,
+    ragePeak: 0,
+    lastMistakeAt: -99,
+    idleSince: 0
+  };
+
+  function resetRaceStats(){
+    game.playTime = 0;
+    game.cornersPassed = 0;
+    game.cornerPointer = 0;
+    game.progressIdx = 0;
+    game.lastCheckpointCorner = 0;
+    game.rage = 0;
+    game.crashes = 0;
+    game.flips = 0;
+    game.cornerFlips.clear();
+    game.longestCorner = 0;
+    game.longestCornerTime = 0;
+    game.cornerEnterTime = 0;
+    game.ragePeak = 0;
+    game.lastMistakeAt = -99;
+    game.idleSince = 0;
+  }
+
+  /* ---------------------------- 11. 输入 ---------------------------- */
+  const keys = Object.create(null);
+  const input = { throttle:0, brake:0, steer:0, handbrake:false };
+
+  const steerHistory = [];   // 转向延迟队列
+  let lastSteerRaw = 0;
+
+  window.addEventListener('keydown', (e)=>{
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+    if (keys[e.code]) return;
+    keys[e.code] = true;
+
+    if (state === State.ENDING && endingReady) closeEnding();
+  });
+  window.addEventListener('keyup', (e)=>{ keys[e.code] = false; });
+  window.addEventListener('blur', ()=>{ for (const k in keys) keys[k] = false; });
+
+  function readInput(){
+    const up = keys['KeyW'] || keys['ArrowUp'];
+    const down = keys['KeyS'] || keys['ArrowDown'];
+    const left = keys['KeyA'] || keys['ArrowLeft'];
+    const right = keys['KeyD'] || keys['ArrowRight'];
+    input.throttle = up ? 1 : 0;
+    input.brake = down ? 1 : 0;
+    input.handbrake = !!keys['Space'];
+    let s = 0;
+    if (left) s -= 1;
+    if (right) s += 1;
+    input.steer = s;
+
+    // 记录原始转向 + 时间戳，用于延迟队列（按真实时间取，不按帧数）
+    const nowT = performance.now() / 1000;
+    steerHistory.push({ t: nowT, v: s });
+    while (steerHistory.length && nowT - steerHistory[0].t > 2.0) steerHistory.shift();
+  }
+
+  // 取 delay 秒前的转向输入
+  function delayedSteer(delaySec){
+    if (!steerHistory.length) return 0;
+    const want = steerHistory[steerHistory.length-1].t - delaySec;
+    for (let i = steerHistory.length-1; i>=0; i--){
+      if (steerHistory[i].t <= want) return steerHistory[i].v;
+    }
+    return 0;
+  }
+
+  /* ---------------------------- 12. 车辆物理 ---------------------------- */
+  const tmpV = new THREE.Vector3();
+  const tmpQ = new THREE.Quaternion();
+  const tmpM = new THREE.Matrix4();
+
+  function bodyPos(){ const t = chassisBody.translation(); return new THREE.Vector3(t.x, t.y, t.z); }
+  function bodyQuat(){ const r = chassisBody.rotation(); return new THREE.Quaternion(r.x, r.y, r.z, r.w); }
+
+  // 车体上某点速度 = v + ω × r
+  function pointVelocity(rWorld, out){
+    const v = chassisBody.linvel();
+    const w = chassisBody.angvel();
+    out.set(
+      v.x + (w.y * rWorld.z - w.z * rWorld.y),
+      v.y + (w.z * rWorld.x - w.x * rWorld.z),
+      v.z + (w.x * rWorld.y - w.y * rWorld.x)
+    );
+    return out;
+  }
+
+  // 解析式"射线检测"：求车轮正下方路面的高度。
+  // refY = 车辆当前高度。赛道会出现立交（上下两层路面在平面上只差几米），
+  // 只按平面距离找最近点会选错层，车就会"浮"在上层路面上、轮子全离地而卡死。
+  // 所以把高度差也计入代价，优先选同一层。
+  function groundAt(x, z, hintIdx, refY){
+    const pd = track.pd;
+    const pts = pd.pts;
+    const lo = Math.max(0, hintIdx - 90);
+    const hi = Math.min(pts.length - 1, hintIdx + 90);
+    let best = hintIdx, bs = Infinity, bd = Infinity;
+    for (let i = lo; i <= hi; i++){
+      const dx = x - pts[i].x, dz = z - pts[i].z;
+      const d = dx*dx + dz*dz;
+      let sc = d;
+      if (refY !== undefined){
+        const dy = pts[i].y - refY;
+        sc += dy*dy*6;
+      }
+      if (sc < bs){ bs = sc; best = i; bd = d; }
+    }
+    const P = pts[best], T = pd.tangents[best], R = pd.rights[best];
+    const dx = x - P.x, dz = z - P.z;
+    const lat = dx*R.x + dz*R.z;
+    const lon = dx*T.x + dz*T.z;
+    // 高度用"相邻两点的真实高度"线性插值，而不是用当前点的坡度外推。
+    // 坡度突变处（陡坡接平路）外推会把地面算高/算低几十厘米，
+    // 悬挂于是和真实三角网打架，车会被卡在坡顶动不了。
+    const j = lon >= 0 ? Math.min(pts.length - 1, best + 1) : Math.max(0, best - 1);
+    const Q = pts[j];
+    const segLon = (Q.x - P.x) * T.x + (Q.z - P.z) * T.z;
+    const y = Math.abs(segLon) > 1e-4
+      ? P.y + (Q.y - P.y) * clamp(lon / segLon, -1.2, 1.2)
+      : P.y;
+    return { y, lat, idx: best, dist: Math.sqrt(bd) };
+  }
+
+  const WHEELS = [
+    { lx:-CONFIG.car.wheel.x, ly:CONFIG.car.wheel.y, lz: CONFIG.car.wheel.z, front:true  },
+    { lx: CONFIG.car.wheel.x, ly:CONFIG.car.wheel.y, lz: CONFIG.car.wheel.z, front:true  },
+    { lx:-CONFIG.car.wheel.x, ly:CONFIG.car.wheel.y, lz:-CONFIG.car.wheel.z, front:false },
+    { lx: CONFIG.car.wheel.x, ly:CONFIG.car.wheel.y, lz:-CONFIG.car.wheel.z, front:false }
+  ];
+
+  let steerAngle = 0;
+  let carPathIdx = 0;
+
+  function stepVehicle(dt){
+    if (!chassisBody || !track) return;
+
+    const q = bodyQuat();
+    const pos = bodyPos();
+    const fwd = new THREE.Vector3(0,0,1).applyQuaternion(q);
+    const rightV = new THREE.Vector3(1,0,0).applyQuaternion(q);
+    const upV = new THREE.Vector3(0,1,0).applyQuaternion(q);
+
+    const speed = chassisBody.linvel();
+    const speedLen = Math.hypot(speed.x, speed.y, speed.z);
+    const pitchSin = clamp(fwd.y, -1, 1);
+    const rageN = game.rage / CONFIG.rage.max;
+
+    /* --- 转向：延迟 + 速度衰减 + 上坡衰减 + 暴躁惩罚 --- */
+    const delay = CONFIG.hell.steerDelay + rageN * CONFIG.rage.delayPenalty;
+    const rawSteer = delayedSteer(delay);
+    const maxSteer = CONFIG.car.maxSteer / (1 + speedLen * CONFIG.car.steerSpeedFalloff);
+    let target = rawSteer * maxSteer;
+    if (pitchSin > 0.02){
+      target *= (1 - CONFIG.hell.uphillSteerPenalty * clamp(pitchSin*2.2, 0, 1));
+    }
+    steerAngle = lerp(steerAngle, target, 1 - Math.exp(-14*dt));
+
+    /* --- 抓地：下坡刹车打滑 + 暴躁值降低抓地 --- */
+    const braking = input.brake > 0;
+    let grip = CONFIG.car.gripNormal;
+    if (input.handbrake) grip = CONFIG.car.gripHandbrake;
+    if (pitchSin < -0.05 && braking){
+      grip *= (1 - CONFIG.hell.downhillGripLoss * clamp(-pitchSin*2.5, 0, 1));
+    }
+    grip *= (1 - rageN * CONFIG.rage.gripPenalty);
+    grip = clamp(grip, 0.06, 0.92);
+
+    /* --- 重力对车头的横向拉扯（上/下坡都会拽偏） --- */
+    if (Math.abs(pitchSin) > 0.03){
+      const pull = -pitchSin * CONFIG.hell.gravitySteerPull * Math.min(speedLen, 40) * dt;
+      const imp = { x: rightV.x*pull*40, y: 0, z: rightV.z*pull*40 };
+      chassisBody.applyImpulseAtPoint(imp, { x:pos.x, y:pos.y-0.2, z:pos.z }, true);
+    }
+
+    /* --- 四轮 --- */
+    const mShare = CONFIG.car.mass / 4;
+    const rest = CONFIG.car.wheel.rest;
+    const radius = CONFIG.car.wheel.radius;
+    const k = CONFIG.car.wheel.stiffness;
+    const c = CONFIG.car.wheel.damping;
+
+    for (const w of WHEELS){
+      const local = new THREE.Vector3(w.lx, w.ly, w.lz).applyQuaternion(q);
+      const attach = new THREE.Vector3().addVectors(pos, local);
+
+      const g = groundAt(attach.x, attach.z, carPathIdx, attach.y);
+      const dist = attach.y - g.y;
+      const maxDist = rest + radius;
+      const onGround = dist <= maxDist;
+
+      if (!onGround){ w.comp = 0; continue; }   // 离地：悬挂完全伸展，轮子下垂
+
+      const compression = clamp(maxDist - dist, 0, rest * 1.6);
+      w.comp = compression;                      // 供可视化用：轮子跟着悬挂上下动
+      const vel = pointVelocity(local, new THREE.Vector3());
+      const velUp = vel.y;
+
+      // 弹簧 + 阻尼
+      let force = k * compression - c * velUp;
+      force = clamp(force, 0, 26000);
+      chassisBody.applyImpulseAtPoint(
+        { x:0, y: force*dt, z:0 },
+        { x:attach.x, y:g.y, z:attach.z },
+        true
+      );
+
+      // 轮胎方向（前轮带转向角）
+      const steer = w.front ? steerAngle : 0;
+      const wheelDir = fwd.clone().applyAxisAngle(new THREE.Vector3(0,1,0), steer).normalize();
+      const wheelSide = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), wheelDir).normalize();
+
+      const vLong = vel.dot(wheelDir);
+      const vLat  = vel.dot(wheelSide);
+
+      // 横向摩擦（消灭侧滑）。
+      // 关键：用"摩擦圆"上限 μ×悬挂法向力 约束单轮侧向力。否则侧向力没有物理上限，
+      // 高速进弯时四个轮子能一起把车掀翻（实测 54km/h 过 R20 弯直接翻滚）。
+      // 同时把作用点从"接地点"抬到"侧倾中心"，缩短翻车力臂。
+      const gripCap = force * grip * dt;
+      const latImp = clamp(-vLat * mShare * grip, -gripCap, gripCap);
+      const rollY = g.y + CONFIG.car.rollCenter;
+      chassisBody.applyImpulseAtPoint(
+        { x: wheelSide.x*latImp, y:0, z: wheelSide.z*latImp },
+        { x:attach.x, y:rollY, z:attach.z },
+        true
+      );
+
+      // 纵向：驱动 / 刹车 / 滚阻
+      let longImp = 0;
+      if (!w.front && input.throttle > 0){
+        longImp += CONFIG.car.engineForce * 0.5 * dt * input.throttle;
+      }
+      if (braking){
+        let bf = CONFIG.car.brakeForce * 0.25;
+        if (pitchSin < -0.05) bf *= (1 - CONFIG.hell.downhillBrakeLoss * clamp(-pitchSin*2.5,0,1));
+        longImp -= Math.sign(vLong) * bf * dt;
+      }
+      longImp -= Math.sign(vLong) * 40 * dt;   // 滚动阻力
+      // 纵向同样受摩擦圆限制（纵向系数略高，模拟轮胎纵向抓地更强）
+      const longCap = force * grip * 1.4 * dt;
+      longImp = clamp(longImp, -longCap, longCap);
+      // 防止刹车把车推成倒车
+      if (braking && Math.sign(vLong + longImp/mShare) !== Math.sign(vLong) && Math.abs(vLong) < 0.6) longImp = 0;
+      // 注意：纵向力作用在"轮心"而不是"接地点"，否则力臂过大（车身重心到地面近 0.9m），
+      // 一踩油门就会抬车头翻过去。横向摩擦仍然作用在接地点，保留过弯侧倾手感。
+      chassisBody.applyImpulseAtPoint(
+        { x: wheelDir.x*longImp, y:0, z: wheelDir.z*longImp },
+        { x:attach.x, y:attach.y, z:attach.z },
+        true
+      );
+    }
+
+    /* --- 空气阻力 --- */
+    const v = chassisBody.linvel();
+    const drag = CONFIG.car.dragCoef;
+    chassisBody.applyImpulse({
+      x: -v.x * Math.abs(v.x) * drag * dt,
+      y: -v.y * Math.abs(v.y) * drag * dt * 0.4,
+      z: -v.z * Math.abs(v.z) * drag * dt
+    }, true);
+  }
+
+  /* ---------------------------- 13. 进度 / 判定 ---------------------------- */
+  let pendingCrash = null;
+
+  function updateProgress(dt){
+    if (!track) return;
+    const pts = track.pd.pts;
+    const pos = bodyPos();
+    const lo = Math.max(0, carPathIdx - 90);
+    const hi = Math.min(pts.length - 1, carPathIdx + 90);
+    // 同样要按高度加权：立交处两层路面平面距离很近，只看平面会跟错层
+    const refY = pos.y - 0.888;
+    let best = carPathIdx, bs = Infinity;
+    for (let i = lo; i <= hi; i++){
+      const dx = pos.x - pts[i].x, dz = pos.z - pts[i].z;
+      const dy = pts[i].y - refY;
+      const sc = dx*dx + dz*dz + dy*dy*6;
+      if (sc < bs){ bs = sc; best = i; }
+    }
+    carPathIdx = best;
+    game.progressIdx = best;
+
+    // 弯道计数（同时记录每个弯花了多久，用于结算"卡最久的弯"）
+    const arr = track.cornerPathIdx;
+    const before = game.cornerPointer;
+    while (game.cornerPointer < arr.length && arr[game.cornerPointer] <= best) game.cornerPointer++;
+    if (game.cornerPointer > before){
+      const spent = game.playTime - game.cornerEnterTime;
+      if (spent > game.longestCornerTime){
+        game.longestCornerTime = spent;
+        game.longestCorner = before + 1;
+      }
+      game.cornerEnterTime = game.playTime;
+    }
+    game.cornersPassed = game.cornerPointer;
+
+    // 第一关不做任何失败判定：它必须"几乎不可能失败"
+    if (state !== State.L2) return;
+
+    // 出界判定
+    const lat = Math.abs(groundAt(pos.x, pos.z, best, pos.y - 0.888).lat);
+    if (lat > CONFIG.track.halfWidth + CONFIG.hell.offRoadMargin){
+      triggerCrash('offroad');
+      return;
+    }
+
+    // 翻车判定
+    const q = bodyQuat();
+    const carUp = new THREE.Vector3(0,1,0).applyQuaternion(q);
+    if (carUp.y < CONFIG.hell.flipUpDot){
+      flipTimer += dt;
+      if (flipTimer > CONFIG.hell.flipHold){ flipTimer = 0; triggerCrash('flip'); }
+    } else {
+      flipTimer = 0;
+    }
+
+    // 撞击判定（速度突变，来自物理引擎的真实响应）
+    const v = chassisBody.linvel();
+    const spd = Math.hypot(v.x, v.y, v.z);
+    if (lastSpeed !== null){
+      const dv = Math.abs(spd - lastSpeed);
+      const threshold = CONFIG.hell.crashDeltaV * (1 - (game.rage/CONFIG.rage.max) * CONFIG.rage.crashSensitivity);
+      if (dv > threshold && spd < lastSpeed - threshold * 0.8){
+        triggerCrash('crash');
+      }
+    }
+    lastSpeed = spd;
+
+    // 坑
+    checkPotholes(pos, spd);
+
+    // 检查点
+    if (game.cornersPassed >= CONFIG.race.targetCorners){
+      finishRace();
+      return;
+    }
+    const cp = Math.floor(game.cornersPassed / CONFIG.race.checkpointEvery) * CONFIG.race.checkpointEvery;
+    if (cp > game.lastCheckpointCorner){
+      game.lastCheckpointCorner = cp;
+      Taunt.push('检查点。它不会安慰你。');
+    }
+
+    // 长时间不动：先嘲讽，再自救（任何原因卡住都不该让玩家永久停在那儿）
+    if (spd < 1.5){
+      idleTimer += dt;
+    } else {
+      idleTimer = 0;
+    }
+    if (idleTimer > 4.5){
+      idleTimer = 0;
+      game.crashes++;
+      addRage(CONFIG.rage.perCrash * 0.5);
+      Taunt.push('你停在这儿。路不会来找你。');
+      respawnAtCheckpoint();
+    }
+  }
+
+  let flipTimer = 0;
+  let lastSpeed = null;
+  let idleTimer = 0;
+
+  /* ---------------------------- 14. 坑洞 ---------------------------- */
+  let potholes = [];
+  function makePotholes(pd, count, rand){
+    const list = [];
+    for (let i=0;i<count;i++){
+      const idx = Math.floor(rand() * (pd.pts.length - 40)) + 20;
+      const lat = (rand()*2 - 1) * (CONFIG.track.halfWidth - 1.4);
+      list.push({ idx, lat, r: 0.55 + rand()*0.45 });
+    }
+    return list;
+  }
+
+  // 坑洞可视化：贴在路面上的深色椭圆，玩家能看见、能躲
+  let potholeMesh = null;
+  function buildPotholeVisuals(pd, list){
+    if (potholeMesh){
+      scene.remove(potholeMesh);
+      potholeMesh.geometry.dispose();
+      potholeMesh.material.dispose();
+      potholeMesh = null;
+    }
+    if (!list || !list.length) return;
+    const geo = new THREE.CircleGeometry(1, 14);
+    geo.rotateX(-Math.PI/2);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x08090b, roughness: 1, metalness: 0,
+      transparent: true, opacity: 0.95,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2
+    });
+    const inst = new THREE.InstancedMesh(geo, mat, list.length);
+    inst.frustumCulled = false;
+    const mtx = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0,1,0);
+    const pv = new THREE.Vector3();
+    const sv = new THREE.Vector3();
+    for (let i=0;i<list.length;i++){
+      const ph = list[i];
+      const P = pd.pts[ph.idx], R = pd.rights[ph.idx];
+      pv.set(P.x + R.x*ph.lat, P.y + 0.025, P.z + R.z*ph.lat);
+      q.setFromAxisAngle(up, Math.atan2(R.x, R.z));
+      sv.set(ph.r*1.45, 1, ph.r*2.05);
+      mtx.compose(pv, q, sv);
+      inst.setMatrixAt(i, mtx);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    scene.add(inst);
+    potholeMesh = inst;
+  }
+
+  let lastPotholeAt = -99;
+  function checkPotholes(pos, spd){
+    if (!potholes.length) return;
+    for (const p of potholes){
+      if (Math.abs(p.idx - carPathIdx) > 2) continue;
+      const g = groundAt(pos.x, pos.z, carPathIdx, pos.y - 0.888);
+      if (Math.abs(g.lat - p.lat) < p.r + 0.85 && Math.abs(pos.y - g.y) < 1.4){
+        if (game.playTime - lastPotholeAt < 0.7) return;
+        lastPotholeAt = game.playTime;
+        if (spd > CONFIG.hell.potholeSpeedFlip){
+          // 高速过坑：直接掀翻
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          chassisBody.applyImpulse({
+            x:(Math.random()-0.5)*CONFIG.hell.potholeImpulse*0.6,
+            y: CONFIG.hell.potholeImpulse*1.15,
+            z:(Math.random()-0.5)*CONFIG.hell.potholeImpulse*0.6
+          }, true);
+          chassisBody.applyTorqueImpulse({
+            x: dir*CONFIG.hell.potholeImpulse*1.75,
+            y:(Math.random()-0.5)*CONFIG.hell.potholeImpulse*0.5,
+            z: 0
+          }, true);
+          Taunt.push('那个坑一直在那儿。等了你很久。');
+        } else if (spd > CONFIG.hell.potholeSpeedSafe){
+          chassisBody.applyImpulse({ x:0, y: CONFIG.hell.potholeImpulse*0.18, z:0 }, true);
+          chassisBody.applyTorqueImpulse({ x:(Math.random()-0.5)*400, y:0, z:(Math.random()-0.5)*400 }, true);
+          shake(0.35);
+        }
+        return;
+      }
+    }
+  }
+
+  /* ---------------------------- 15. 撞车 / 复位 ---------------------------- */
+  let crashLock = 0;
+  let shakeAmp = 0;
+  function shake(a){ shakeAmp = Math.max(shakeAmp, a); }
+
+  function triggerCrash(kind){
+    if (crashLock > 0) return;
+    crashLock = 1.0;
+
+    if (kind === 'flip'){
+      game.flips++;
+      const ci = Math.max(0, game.cornerPointer - 1);
+      const n = (game.cornerFlips.get(ci) || 0) + 1;
+      game.cornerFlips.set(ci, n);
+      addRage(CONFIG.rage.perFlip);
+      if (n >= 2) Taunt.push('第 ' + (ci+1) + ' 个弯。第 ' + n + ' 次。它记住你了。');
+      else Taunt.push('翻车。天空比路好看吗。');
+    } else {
+      game.crashes++;
+      addRage(CONFIG.rage.perCrash);
+      if (kind === 'offroad') Taunt.push('你出界了。公路没有义务等你。');
+      else Taunt.push('撞了。公路没有反应。');
+    }
+    shake(0.9);
+    respawnAtCheckpoint();
+  }
+
+  function addRage(v){
+    game.rage = clamp(game.rage + v, 0, CONFIG.rage.max);
+    game.ragePeak = Math.max(game.ragePeak, game.rage);
+    game.lastMistakeAt = game.playTime;
+    if (game.rage >= CONFIG.rage.max && !rageTaunted){
+      rageTaunted = true;
+      Taunt.push('暴躁值爆表。方向盘在抖，你也一样。');
+    }
+  }
+  let rageTaunted = false;
+
+  function respawnAtCheckpoint(){
+    if (!track) return;
+    const arr = track.cornerPathIdx;
+    const cpCorner = game.lastCheckpointCorner;
+    let idx = 6;
+    if (cpCorner > 0 && cpCorner < arr.length) idx = Math.max(4, arr[cpCorner] - 4);
+
+    const pd = track.pd;
+    const p = pd.pts[idx];
+    const T = pd.tangents[idx];
+    const q = quatFromForward(T);
+
+    chassisBody.setTranslation({ x:p.x, y:p.y + 1.15, z:p.z }, true);
+    chassisBody.setRotation({ x:q.x, y:q.y, z:q.z, w:q.w }, true);
+    chassisBody.setLinvel({ x:0, y:0, z:0 }, true);
+    chassisBody.setAngvel({ x:0, y:0, z:0 }, true);
+
+    carPathIdx = idx;
+    game.progressIdx = idx;
+    game.cornerPointer = cpCorner;
+    game.cornersPassed = cpCorner;
+    lastSpeed = null;
+    flipTimer = 0;
+    steerAngle = 0;
+    steerHistory.length = 0;
+    camLerp = 0;
+  }
+
+  function quatFromForward(fwd){
+    const z = fwd.clone().normalize();
+    const x = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), z).normalize();
+    const y = new THREE.Vector3().crossVectors(z, x).normalize();
+    tmpM.makeBasis(x, y, z);
+    return new THREE.Quaternion().setFromRotationMatrix(tmpM);
+  }
+
+  /* ---------------------------- 16. 嘲讽系统 ---------------------------- */
+  const toastEl = document.getElementById('toasts');
+  const Taunt = {
+    queue: [],
+    timer: 0,
+    gap: 0,
+    push(text){
+      if (!text) return;
+      if (this.queue.length > 3) return;
+      if (this.queue[this.queue.length-1] === text) return;
+      this.queue.push(text);
+    },
+    update(dt){
+      if (this.timer > 0){
+        this.timer -= dt;
+        if (this.timer <= 0){
+          const first = toastEl.firstElementChild;
+          if (first){
+            first.classList.remove('on');
+            setTimeout(()=>{ if (first.parentNode) first.parentNode.removeChild(first); }, 420);
+          }
+          this.gap = CONFIG.taunt.minGap;
+        }
+        return;
+      }
+      if (this.gap > 0){ this.gap -= dt; return; }
+      if (!this.queue.length) return;
+      const text = this.queue.shift();
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = text;
+      toastEl.appendChild(el);
+      requestAnimationFrame(()=> el.classList.add('on'));
+      this.timer = CONFIG.taunt.duration;
+    },
+    clear(){
+      toastEl.innerHTML = '';
+      this.queue.length = 0;
+      this.timer = 0;
+      this.gap = 0;
+    }
+  };
+
+  /* ---------------------------- 17. 关卡一 ---------------------------- */
+  let l1 = { steerWas:0, lastDir:0, mashTimes:[], idleFired:false, throttleTaunted:false, releaseTaunted:false, mashTaunted:false, lastThrottleAt:-99 };
+
+  function buildStraightTrack(len){
+    const pts = [];
+    for (let z = 0; z <= len; z += CONFIG.track.sample){
+      pts.push(new THREE.Vector3(0, 0, z));
+    }
+    const pd = buildPathData(pts);
+    return pd;
+  }
+
+  function startLevel1(){
+    state = State.L1;
+    Taunt.clear();
+    resetRaceStats();
+    potholes = [];
+    l1 = { steerWas:0, lastDir:0, mashTimes:[], idleFired:false, throttleTaunted:false, releaseTaunted:false, mashTaunted:false, lastThrottleAt:-99 };
+    level1Done = false;
+
+    const pd = buildStraightTrack(520);
+    installTrack(pd, []);
+
+    chassisBody.setTranslation({ x:0, y:1.2, z:6 }, true);
+    const q = quatFromForward(new THREE.Vector3(0,0,1));
+    chassisBody.setRotation({ x:q.x, y:q.y, z:q.z, w:q.w }, true);
+    chassisBody.setLinvel({x:0,y:0,z:0}, true);
+    chassisBody.setAngvel({x:0,y:0,z:0}, true);
+    carPathIdx = 2;
+    lastSpeed = null;
+    steerHistory.length = 0;
+
+    // 白天
+    scene.background = new THREE.Color(0x9db9d4);
+    scene.fog = new THREE.Fog(0x9db9d4, 90, 460);
+    hemi.intensity = 1.0;
+    hemi.color.setHex(0xbdd6f0);
+    sun.intensity = 1.15;
+    sun.color.setHex(0xfff4e0);
+    headL.intensity = 0; headR.intensity = 0;
+
+    setHudLevel('第一关 · 直道', true);
+    showTitleCard('第一关 · 直道', '请直走');
+    startAt = performance.now();
+  }
+
+  function updateLevel1(dt){
+    // 自动前进：不用踩油门也会走；踩油门只是稍微快一点
+    // 用速度恒定器而不是纯推力，保证这关"几乎不可能失败"
+    const v = chassisBody.linvel();
+    const fwdSpeed = v.z;
+    const cruise = 18 + input.throttle * 12;
+    chassisBody.applyImpulse({ x:0, y:0, z: (cruise - fwdSpeed) * 320 * dt }, true);
+    // 自动回正：车永远比人稳
+    const pos = bodyPos();
+    const g = groundAt(pos.x, pos.z, carPathIdx, pos.y - 0.888);
+    const pull = -g.lat * 2.4;
+    chassisBody.applyImpulseAtPoint(
+      { x: pull * 60 * dt, y:0, z:0 },
+      { x:pos.x, y:pos.y - 0.2, z:pos.z },
+      true
+    );
+
+    // 嘲讽触发
+    if (input.throttle > 0){
+      l1.lastThrottleAt = game.playTime;
+      if (!l1.throttleTaunted){
+        l1.throttleTaunted = true;
+        Taunt.push('这关的难度在于忍住不笑。');
+      }
+    }
+    // 左右乱打：统计"打方向 → 反打"的方向翻转次数，2.5 秒内翻 5 次才算乱打
+    if (input.steer !== 0 && l1.lastDir !== 0 && input.steer !== l1.lastDir){
+      l1.mashTimes.push(game.playTime);
+      while (l1.mashTimes.length && game.playTime - l1.mashTimes[0] > 2.5) l1.mashTimes.shift();
+    }
+    if (input.steer !== 0) l1.lastDir = input.steer;
+    if (l1.steerWas !== 0 && input.steer === 0 && !l1.releaseTaunted){
+      l1.releaseTaunted = true;
+      Taunt.push('你松手了。车依然笔直。它比你稳。');
+    }
+    l1.steerWas = input.steer;
+
+    // 左右乱打
+    if (!l1.mashTaunted && l1.mashTimes.length >= 5){
+      l1.mashTaunted = true;
+      Taunt.push('检测到你在努力。系统表示不理解。');
+    }
+
+    // 一直不碰油门
+    if (!l1.idleFired && game.playTime > 12 && game.playTime - l1.lastThrottleAt > 6){
+      l1.idleFired = true;
+      Taunt.push('前方依然是直的。真的。');
+    }
+
+    // 通关
+    if (carPathIdx >= track.pd.pts.length - 8){
+      finishLevel1();
+    }
+  }
+
+  let level1Done = false;
+  function finishLevel1(){
+    if (level1Done) return;
+    level1Done = true;
+    state = State.TITLE;          // 冻结驾驶，进入过场
+    Taunt.push('恭喜。你证明了你会直走。');
+    setTimeout(()=>{
+      showTitleCard('第二关 · 地狱弯道', '累计通过 ' + CONFIG.race.targetCorners + ' 个弯');
+      setTimeout(()=>{
+        level1Done = false;
+        startLevel2();
+      }, 2200);
+    }, 2600);
+  }
+
+  /* ---------------------------- 18. 关卡二 ---------------------------- */
+  function startLevel2(){
+    state = State.L2;
+    Taunt.clear();
+    resetRaceStats();
+    rageTaunted = false;
+    passed37 = false;
+    idleTaunted = false;
+    hudEl.classList.remove('hidden');
+    resetEndScene();
+
+    // 生成 + 自交校验：随机赛道有概率绕回来压到自己身上，
+    // 那就换一个 seed 重掷，取分离度最高的那一次。
+    const needSep = CONFIG.track.halfWidth * 2 + 6;
+    let bestPts = null, bestApex = null, bestSep = -1;
+    for (let k = 0; k < 5; k++){
+      const gen = generateTrack(CONFIG.race.targetCorners, CONFIG.track.seed + k * 101);
+      const cand = sampleSpline(gen.ctrl, CONFIG.track.sample);
+      const sep = minSelfSeparation(cand);
+      if (sep > bestSep){ bestSep = sep; bestPts = cand; bestApex = gen.apexes; }
+      if (sep >= needSep) break;
+    }
+    const pts = bestPts;
+    const apexes = bestApex;
+    const pd = buildPathData(pts);
+    const cornerPathIdx = mapApexes(pts, apexes);
+
+    installTrack(pd, cornerPathIdx);
+    potholes = makePotholes(pd, Math.floor(pts.length * 0.02), mulberry32(CONFIG.track.seed + 7));
+    buildPotholeVisuals(pd, potholes);
+
+    const p = pd.pts[4];
+    const q = quatFromForward(pd.tangents[4]);
+    chassisBody.setTranslation({ x:p.x, y:p.y + 1.15, z:p.z }, true);
+    chassisBody.setRotation({ x:q.x, y:q.y, z:q.z, w:q.w }, true);
+    chassisBody.setLinvel({x:0,y:0,z:0}, true);
+    chassisBody.setAngvel({x:0,y:0,z:0}, true);
+    carPathIdx = 4;
+    game.progressIdx = 4;
+    lastSpeed = null;
+    steerHistory.length = 0;
+    idleTimer = 0;
+
+    // 夜晚
+    scene.background = new THREE.Color(0x070a12);
+    scene.fog = new THREE.Fog(0x070a12, 35, 240);
+    hemi.intensity = 0.30;
+    hemi.color.setHex(0x30405c);
+    sun.intensity = 0.32;
+    sun.color.setHex(0x8ea6d0);
+    headL.intensity = 4.2; headR.intensity = 4.2;
+
+    setHudLevel('第二关 · 地狱弯道', false);
+    showTitleCard('第二关 · 地狱弯道', '累计通过 ' + CONFIG.race.targetCorners + ' 个弯道');
+    startAt = performance.now();
+    ambientTimer = 18;
+  }
+
+  let ambientTimer = 18;
+  const AMBIENT = [
+    '路灯还亮着。它在等你过去。',
+    '后视镜里没有车。也没有人。',
+    '引擎在响。它在替你表达。',
+    '这条路是你自己选的。',
+    '弯道不看你的表情。',
+    '坡度不会因为你不高兴就变缓。',
+    '护栏是给别人准备的。',
+    '导航早就放弃了。',
+    '远处那盏灯，不会更近。',
+    '车速表很诚实。',
+    '你可以慢一点。没用。',
+    '方向盘知道你在想什么。它不在乎。'
+  ];
+
+  function updateLevel2(dt){
+    // 随机旁白
+    ambientTimer -= dt;
+    if (ambientTimer <= 0){
+      ambientTimer = 26 + Math.random() * 22;
+      Taunt.push(AMBIENT[Math.floor(Math.random() * AMBIENT.length)]);
+    }
+    // 第 37 弯
+    if (game.cornersPassed === 37 && !passed37){
+      passed37 = true;
+      Taunt.push('第 37 个弯。它终于放过你了。');
+    }
+    // 撞车后原地不动
+    if (idleTimer > CONFIG.taunt.idleSec && !idleTaunted){
+      idleTaunted = true;
+      Taunt.push('你停在这里。后视镜里什么都没有。');
+    }
+    if (idleTimer < 2) idleTaunted = false;
+  }
+  let passed37 = false;
+  let idleTaunted = false;
+
+  /* ---------------------------- 19. 通关结算 ---------------------------- */
+  const endingEl = document.getElementById('ending');
+  const againBtn = document.getElementById('again');
+  const e1 = document.getElementById('e1');
+  const e2 = document.getElementById('e2');
+  const e2s = document.getElementById('e2s');
+  const e3 = document.getElementById('e3');
+  const e4 = document.getElementById('e4');
+  const e5 = document.getElementById('e5');
+
+  let endingReady = false;
+  let endingT = 0;
+  const endingFlags = { a:false, b:false, c:false, d:false };
+
+  function finishRace(){
+    if (state !== State.L2) return;
+    state = State.ENDING;
+    endingT = 0;
+    endingReady = false;
+    endingFlags.a = endingFlags.b = endingFlags.c = endingFlags.d = false;
+
+    buildEndScene();
+    resetEndScene();
+    hudEl.classList.add('hidden');
+
+    const hours = Math.max(0.1, game.playTime / 3600);
+    const N = hours.toFixed(1);
+
+    e1.textContent = '通关';
+    e2.textContent = '你浪费了你人生中宝贵的 ' + N + ' 小时。';
+    let extra = '';
+    if (hours < 1) extra = '才一小时？你不够虔诚。';
+    else if (hours >= 3) extra = '我们建议你出去走走。';
+    e2s.textContent = extra;
+
+    const worst = worstCorner();
+    e3.innerHTML =
+      '撞车 ' + game.crashes + ' 次 ｜ 翻车 ' + game.flips + ' 次<br>' +
+      '卡最久的弯：第 ' + worst + ' 弯 ｜ 暴躁值峰值：' + Math.round(game.ragePeak);
+
+    // 清空所有 fade 类
+    [e1,e2,e2s,e3,e4,e5].forEach(el=> el.classList.remove('on'));
+
+    endingEl.classList.remove('hidden');
+    endingEl.style.opacity = '1';
+    againBtn.classList.remove('on');
+    Taunt.clear();
+  }
+
+  function worstCorner(){
+    if (game.longestCorner > 0) return game.longestCorner;
+    let bestCorner = 0, bestN = -1;
+    for (const [c, n] of game.cornerFlips){
+      if (n > bestN){ bestN = n; bestCorner = c; }
+    }
+    if (bestN <= 0) return Math.max(1, game.cornerPointer);
+    return bestCorner + 1;
+  }
+
+  function updateEnding(dt){
+    endingT += dt;
+    if (!endingFlags.a){ endingFlags.a = true; e1.classList.add('on'); }
+    if (endingT > 1.5 && !endingFlags.b){
+      endingFlags.b = true;
+      e2.classList.add('on');
+      if (e2s.textContent) e2s.classList.add('on');
+    }
+    if (endingT > 3.5 && !endingFlags.c){
+      endingFlags.c = true;
+      e3.classList.add('on');
+    }
+    if (endingT > 5.0 && !endingFlags.d){
+      endingFlags.d = true;
+      e4.classList.add('on');
+      e5.classList.add('on');
+      endingReady = true;
+    }
+    updateEndScene(dt);
+  }
+
+  function closeEnding(){
+    endingReady = false;
+    endingEl.style.opacity = '0';
+    setTimeout(()=>{
+      endingEl.classList.add('hidden');
+      againBtn.classList.add('on');
+    }, 900);
+  }
+
+  againBtn.addEventListener('click', ()=>{
+    againBtn.classList.remove('on');
+    endingEl.classList.add('hidden');
+    endingEl.style.opacity = '1';
+    startLevel2();
+  });
+
+  /* ---------------------------- 20. 结算夜景 ---------------------------- */
+  const endLights = [];
+  let endSceneBuilt = false;
+  let endCamT = 0;
+
+  function buildEndScene(){
+    if (endSceneBuilt) return;
+    endSceneBuilt = true;
+
+    endScene.background = new THREE.Color(0x04060a);
+    endScene.fog = new THREE.Fog(0x04060a, 30, 190);
+
+    endScene.add(new THREE.AmbientLight(0x223044, 0.55));
+    const moon = new THREE.DirectionalLight(0x7f96c4, 0.32);
+    moon.position.set(-40, 60, -30);
+    endScene.add(moon);
+
+    // 地面
+    const groundGeo = new THREE.PlaneGeometry(600, 600);
+    const groundMat = new THREE.MeshStandardMaterial({ color:0x0a0c10, roughness:1 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    ground.position.y = -0.02;
+    endScene.add(ground);
+
+    // 一条笔直的公路
+    const roadGeo = new THREE.PlaneGeometry(11, 600);
+    const roadMat = new THREE.MeshStandardMaterial({ color:0x191b1f, roughness:0.95 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI/2;
+    road.position.y = 0;
+    endScene.add(road);
+
+    // 中线
+    for (let z = -280; z < 280; z += 12){
+      const dash = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.16, 4),
+        new THREE.MeshBasicMaterial({ color:0x8d8a80 })
+      );
+      dash.rotation.x = -Math.PI/2;
+      dash.position.set(0, 0.012, z);
+      endScene.add(dash);
+    }
+
+    // 路灯
+    const poleMat = new THREE.MeshStandardMaterial({ color:0x1d2025, roughness:0.85, metalness:0.3 });
+    for (let i=0;i<7;i++){
+      const z = -12 - i*24;
+      const g = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.12,7,6), poleMat);
+      pole.position.set(0, 3.5, 0);
+      g.add(pole);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(1.4,0.1,0.1), poleMat);
+      arm.position.set(-0.7, 7, 0);
+      g.add(arm);
+      const bulbMat = new THREE.MeshBasicMaterial({ color:0xffdca8 });
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), bulbMat);
+      bulb.position.set(-1.4, 6.9, 0);
+      g.add(bulb);
+      const glowMat = new THREE.MeshBasicMaterial({ color:0xffdca8, transparent:true, opacity:0.16, depthWrite:false });
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), glowMat);
+      glow.position.copy(bulb.position);
+      g.add(glow);
+      g.position.set(8, 0, z);
+      endScene.add(g);
+      endLights.push({ bulb: bulbMat, glow: glowMat, off:false });
+    }
+
+    // 车停在路边
+    const car = buildCarVisual();
+    car.group.position.set(4.2, CAR_REST_Y, 6);
+    car.group.rotation.y = 0.10;
+    endScene.add(car.group);
+    endCar = car;
+
+    // 一点氛围光
+    const fill = new THREE.PointLight(0xffd9a0, 1.2, 40, 2);
+    fill.position.set(6.6, 6.5, -12);
+    endScene.add(fill);
+  }
+
+  let endCar = null;
+
+  // 重开时把路灯重新点亮
+  function resetEndScene(){
+    for (const l of endLights){
+      l.off = false;
+      l.bulb.color.setHex(0xffdca8);
+      l.glow.opacity = 0.16;
+    }
+    endCamT = 0;
+  }
+
+  function updateEndScene(dt){
+    endCamT += dt;
+    camera.position.set(
+      Math.sin(endCamT * 0.06) * 2.2,
+      2.6 + Math.sin(endCamT * 0.11) * 0.25,
+      22 - endCamT * 0.55
+    );
+    camera.lookAt(0, 2.0, -34);
+
+    // 路灯一盏盏熄灭
+    for (let i=0;i<endLights.length;i++){
+      const t = 1.2 + i * 1.5;
+      if (endingT > t && !endLights[i].off){
+        endLights[i].off = true;
+        endLights[i].bulb.color.setHex(0x1a1a18);
+        endLights[i].glow.opacity = 0;
+      }
+    }
+  }
+
+  /* ---------------------------- 21. 相机 ---------------------------- */
+  let camLerp = 0;
+  const camPos = new THREE.Vector3(0, 5, -10);
+  const camLook = new THREE.Vector3();
+
+  function updateCamera(dt){
+    const pos = bodyPos();
+    const q = bodyQuat();
+    const fwd = new THREE.Vector3(0,0,1).applyQuaternion(q);
+    const flatFwd = new THREE.Vector3(fwd.x, 0, fwd.z);
+    if (flatFwd.lengthSq() < 1e-4) flatFwd.set(0,0,1);
+    flatFwd.normalize();
+
+    const speed = chassisBody.linvel();
+    const spd = Math.hypot(speed.x, speed.y, speed.z);
+    const back = 8.2 + Math.min(spd * 0.10, 3.4);
+    const height = 3.4 + Math.min(spd * 0.02, 0.8);
+
+    const want = new THREE.Vector3(
+      pos.x - flatFwd.x * back,
+      pos.y + height,
+      pos.z - flatFwd.z * back
+    );
+
+    camLerp = Math.min(1, camLerp + dt * 2.2);
+    const k = 1 - Math.exp(-6.5 * dt);
+    camPos.lerp(want, k);
+
+    camera.position.copy(camPos);
+    if (shakeAmp > 0.001){
+      camera.position.x += (Math.random()-0.5) * shakeAmp * 0.6;
+      camera.position.y += (Math.random()-0.5) * shakeAmp * 0.5;
+      shakeAmp *= Math.exp(-4 * dt);
+    }
+
+    camLook.lerp(new THREE.Vector3(pos.x + flatFwd.x * 8, pos.y + 1.0, pos.z + flatFwd.z * 8), k);
+    camera.lookAt(camLook);
+
+    // 车灯跟随
+    const nose = new THREE.Vector3(pos.x + fwd.x * 2.2, pos.y + 0.1, pos.z + fwd.z * 2.2);
+    const far = new THREE.Vector3(pos.x + fwd.x * 34, pos.y - 2.2, pos.z + fwd.z * 34);
+    headL.position.set(nose.x - flatFwd.z * 0.62, nose.y, nose.z + flatFwd.x * 0.62);
+    headR.position.set(nose.x + flatFwd.z * 0.62, nose.y, nose.z - flatFwd.x * 0.62);
+    headL.target.position.copy(far);
+    headR.target.position.copy(far);
+  }
+
+  /* ---------------------------- 22. HUD ---------------------------- */
+  const levelNameEl = document.getElementById('levelName');
+  const hudEl = document.getElementById('hud');
+  const spdEl = document.getElementById('spd');
+  const progLabel = document.getElementById('progLabel');
+  const progVal = document.getElementById('progVal');
+  const progBar = document.getElementById('progBar');
+  const rageWrap = document.getElementById('rageWrap');
+  const rageVal = document.getElementById('rageVal');
+  const rageBar = document.getElementById('rageBar');
+  const progressWrap = document.getElementById('progressWrap');
+  const titleCard = document.getElementById('titleCard');
+  const tcBig = document.getElementById('tcBig');
+  const tcSmall = document.getElementById('tcSmall');
+
+  function setHudLevel(name, isL1){
+    levelNameEl.textContent = name;
+    if (isL1){
+      progressWrap.style.visibility = 'hidden';
+      rageWrap.style.visibility = 'hidden';
+    } else {
+      progressWrap.style.visibility = 'visible';
+      rageWrap.style.visibility = 'visible';
+      progLabel.textContent = '弯道';
+      progVal.textContent = '0 / ' + CONFIG.race.targetCorners;
+      progBar.style.width = '0%';
+    }
+  }
+
+  let titleToken = 0;
+  function showTitleCard(big, small){
+    const my = ++titleToken;
+    tcBig.textContent = big;
+    tcSmall.textContent = small;
+    titleCard.classList.remove('hidden');
+    titleCard.classList.remove('fade-out');
+    setTimeout(()=>{ if (my !== titleToken) return; titleCard.classList.add('fade-out'); }, 1400);
+    setTimeout(()=>{ if (my !== titleToken) return; titleCard.classList.add('hidden'); }, 2400);
+  }
+
+  function updateHud(){
+    const v = chassisBody ? chassisBody.linvel() : {x:0,y:0,z:0};
+    const spd = Math.hypot(v.x, v.y, v.z) * 3.6;
+    spdEl.textContent = Math.round(spd);
+
+    if (state === State.L2 || state === State.ENDING){
+      progVal.textContent = game.cornersPassed + ' / ' + CONFIG.race.targetCorners;
+      progBar.style.width = (game.cornersPassed / CONFIG.race.targetCorners * 100) + '%';
+      rageVal.textContent = Math.round(game.rage);
+      rageBar.style.width = game.rage + '%';
+    }
+  }
+
+  /* ---------------------------- 23. 主循环 ---------------------------- */
+  let lastTime = performance.now();
+  let acc = 0;
+  let startAt = performance.now();
+
+  function loop(){
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    let dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if (dt > 0.05) dt = 0.05;
+    if (dt <= 0) return;
+
+    readInput();
+
+    if (state === State.L1 || state === State.L2){
+      game.playTime += dt;
+      if (crashLock > 0) crashLock -= dt;
+
+      // 暴躁值自然消退
+      if (game.playTime - game.lastMistakeAt > 4){
+        game.rage = Math.max(0, game.rage - CONFIG.rage.decayPerSec * dt);
+      }
+
+      // 物理固定步长
+      acc += dt;
+      let steps = 0;
+      while (acc >= CONFIG.world.fixedStep && steps < CONFIG.world.maxSubSteps){
+        stepVehicle(CONFIG.world.fixedStep);
+        world.step();
+        acc -= CONFIG.world.fixedStep;
+        steps++;
+      }
+      if (steps === CONFIG.world.maxSubSteps) acc = 0;
+
+      updateProgress(dt);
+      if (state === State.L1) updateLevel1(dt);
+      else if (state === State.L2) updateLevel2(dt);
+
+      updateCamera(dt);
+    }
+
+    // 车辆可视化同步
+    if (chassisBody){
+      const t = chassisBody.translation();
+      const r = chassisBody.rotation();
+      carVisual.group.position.set(t.x, t.y, t.z);
+      carVisual.group.quaternion.set(r.x, r.y, r.z, r.w);
+      // 轮子转向/滚动
+      const v = chassisBody.linvel();
+      const spd = Math.hypot(v.x, v.y, v.z);
+      for (let i=0;i<carVisual.wheels.length;i++){
+        const w = carVisual.wheels[i];
+        const src = WHEELS[i];
+        // 轮子随悬挂压缩上下移动：悬挂长度 L = rest - compression
+        const L = Math.max(0.02, CONFIG.car.wheel.rest - (src ? src.comp || 0 : 0));
+        w.pivot.position.y = CONFIG.car.wheel.y - L;
+        if (w.front) w.pivot.rotation.y = steerAngle;
+        w.mesh.rotation.x += spd * 0.09;
+      }
+    }
+
+    Taunt.update(dt);
+
+    if (state === State.ENDING){
+      updateEnding(dt);
+      updateHud();
+      renderer.render(endScene, camera);
+    } else {
+      updateHud();
+      renderer.render(scene, camera);
+    }
+  }
+
+  /* ---------------------------- 24. 启动 ---------------------------- */
+  bootMsg.textContent = '正在铺设公路…';
+  // 先跑一帧空场景，避免白屏
+  renderer.render(scene, camera);
+
+  bootEl.style.opacity = '0';
+  setTimeout(()=> bootEl.classList.add('hidden'), 700);
+
+  startLevel1();
+  loop();
+
+  // 键盘 R：回检查点
+  window.addEventListener('keydown', (e)=>{
+    if (e.code === 'KeyR' && state === State.L2 && crashLock <= 0){
+      crashLock = 0.8;
+      respawnAtCheckpoint();
+      Taunt.push('回到上一个检查点。它也不欢迎你。');
+    }
+  });
+})();
+</script>
+</body>
+</html>
