@@ -43,6 +43,11 @@
   .speedo .num{ font-size:56px; line-height:.9; font-weight:300; letter-spacing:-.02em; }
   .speedo .unit{ font-size:12px; letter-spacing:.2em; color:var(--dim); }
 
+  .weather-tag{ display:inline-block; font-size:13px; padding:2px 10px; border-radius:2px; background:rgba(236,233,227,.08); letter-spacing:.08em; margin-bottom:4px; transition:all .6s ease; }
+  .weather-tag.rain{ background:rgba(80,120,180,.25); color:#a8c8e8; }
+  .weather-tag.fog{ background:rgba(180,180,170,.18); color:#ccc8c0; }
+  .weather-tag.ice{ background:rgba(140,190,220,.22); color:#b0d8f0; }
+
   .progress{ flex:1; max-width:520px; }
   .progress .label{ display:flex; justify-content:space-between; font-size:12px; color:var(--dim); letter-spacing:.1em; margin-bottom:8px; }
   .bar{ height:2px; background:rgba(236,233,227,.12); position:relative; overflow:hidden; }
@@ -189,9 +194,10 @@
       <b id="levelName">第一关 · 直道</b>
     </div>
     <div class="hud-right">
+      <span id="weatherTag" class="weather-tag">☀ 晴</span><br>
       <kbd>W</kbd><kbd>↑</kbd> 油门　<kbd>S</kbd><kbd>↓</kbd> 刹车<br>
       <kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> 转向　<kbd>空格</kbd> 手刹<br>
-      <kbd>R</kbd> 回检查点
+      <kbd>R</kbd> 重新开始
     </div>
   </div>
 
@@ -339,6 +345,50 @@ const CONFIG = {
     sample: 2.5,             // 路面采样间距
     seed: 20261112,
     colliderExtra: 0.8       // 物理地面比视觉路面宽出的米数（留一点路肩，别让车身骑在边线上被勾住）
+  },
+
+  /* --- 渐进式难度 --- */
+  progressive: {
+    enable: true,
+    // 弯道半径随进度递减：前 50 弯用正常范围，之后逐步收紧
+    radiusShrinkPer50: 3.0,  // 每 50 弯，最小/最大半径各减这么多
+    minRadiusFloor: 9,       // 半径下限，不能再小了（小于半路宽路面会折叠）
+    // 路宽随进度递减
+    halfWidthShrinkPer50: 0.5, // 每 50 弯半路宽减 0.5m
+    minHalfWidth: 4.0,         // 半路宽下限
+    // 后期弯道类型概率偏移：越往后急弯和盲弯越多
+    hairpinBiasStart: 80,   // 第 80 弯开始增加发卡弯概率
+    blindBiasStart: 120     // 第 120 弯开始增加盲弯概率
+  },
+
+  /* --- 动态天气 --- */
+  weather: {
+    enable: true,
+    changeEvery: 22,        // 每 N 个弯可能换天气
+    types: ['clear', 'rain', 'fog', 'ice'],
+    rainGripMul: 0.55,      // 雨天抓地系数
+    iceGripMul: 0.20,       // 冰面抓地系数
+    rainVisDist: 140,       // 雨天能见度
+    fogVisDist: 55,         // 雾天能见度
+    iceVisDist: 100,        // 冰面能见度
+    clearVisDist: 240,      // 晴天能见度（夜晚基线）
+    transitionSec: 3.0,     // 天气过渡时间
+    firstChangeSec: 30,     // 第一次天气切换时间
+    intervalMin: 35,        // 天气切换间隔下限
+    intervalMax: 70         // 天气切换间隔上限
+  },
+
+  /* --- 路面陷阱 --- */
+  hazards: {
+    icePatchCount: 14,      // 冰面数量
+    icePatchLen: 12,        // 冰面沿赛道长度（米）
+    iceGripMul: 0.12,       // 冰面抓地
+    oilSlickCount: 10,      // 油渍数量
+    oilSlickLen: 8,         // 油渍长度
+    oilGripMul: 0.22,       // 油渍抓地
+    rockCount: 8,           // 落石数量
+    rockRadius: 0.7,        // 落石碰撞半径
+    rockImpulse: 6000       // 撞落石冲击力
   }
 };
 
@@ -528,38 +578,53 @@ function mulberry32(a){
     let guard = 0;
 
     // 生成"一段"路（一个随机分支），返回值之外只做副作用
+    // 渐进式难度：弯道半径随进度递减，后期弯更急
+    function progRadius(base, variance){
+      const prog = CONFIG.progressive;
+      if (!prog.enable) return base + rand() * variance;
+      const shrink = Math.floor(count / 50) * prog.radiusShrinkPer50;
+      const minR = Math.max(prog.minRadiusFloor, CONFIG.race.cornerRadiusMin - shrink);
+      const maxR = Math.max(minR + 3, CONFIG.race.cornerRadiusMax - shrink);
+      const r = clamp(base + rand() * variance, minR, maxR);
+      return r;
+    }
     function buildOne(){
       const r = rand();
-      if (r < 0.30){
+      const prog = CONFIG.progressive;
+      // 后期增加急弯和盲弯概率
+      let hairpinBoost = 0, blindBoost = 0;
+      if (prog.enable && count > prog.hairpinBiasStart) hairpinBoost = 0.08;
+      if (prog.enable && count > prog.blindBiasStart) blindBoost = 0.10;
+      if (r < 0.30 - hairpinBoost - blindBoost){
         // 单弯
-        corner((38 + rand()*52) * pickDir(), 20 + rand()*20, elev(7));
+        corner((38 + rand()*52) * pickDir(), progRadius(20, 20), elev(7));
         count++;
         straight(26 + rand()*34);
-      } else if (r < 0.50){
+      } else if (r < 0.50 - hairpinBoost - blindBoost){
         // S 弯：连续三个反向弯
         let d = pickDir();
         for (let i=0;i<3 && count<cornerTarget;i++){
-          corner((42 + rand()*42) * d, 19 + rand()*15, elev(5));
+          corner((42 + rand()*42) * d, progRadius(19, 15), elev(5));
           count++;
           d = -d;
           straight(13 + rand()*13);
         }
         straight(30 + rand()*26);
-      } else if (r < 0.66){
+      } else if (r < 0.66 - blindBoost){
         // 发卡弯
-        corner((148 + rand()*38) * pickDir(), 9 + rand()*6, elev(4));
+        corner((148 + rand()*38) * pickDir(), progRadius(9, 6), elev(4));
         count++;
         straight(28 + rand()*28);
       } else if (r < 0.84){
         // 陡坡 + 急弯组合
         straight(28 + rand()*18, (rand()<0.5?1:-1) * (6 + rand()*5));
-        corner((62 + rand()*48) * pickDir(), 12 + rand()*10, 0);
+        corner((62 + rand()*48) * pickDir(), progRadius(12, 10), 0);
         count++;
         straight(26 + rand()*18, -(5 + rand()*6));
       } else {
         // 盲弯：长直道后突然一个急弯
         straight(72 + rand()*46);
-        corner((82 + rand()*40) * pickDir(), 11 + rand()*8, elev(6));
+        corner((82 + rand()*40) * pickDir(), progRadius(11, 8), elev(6));
         count++;
         straight(28 + rand()*24);
       }
@@ -1275,7 +1340,12 @@ function mulberry32(a){
       grip *= (1 - CONFIG.hell.downhillGripLoss * clamp(-pitchSin*2.5, 0, 1));
     }
     grip *= (1 - rageN * CONFIG.rage.gripPenalty);
-    grip = clamp(grip, 0.06, 0.92);
+    /* --- 天气 + 路面陷阱：叠加降低抓地 --- */
+    grip *= weather.gripMul;
+    const pathIdx = nearestPathIndex(pos);
+    currentHazardGrip = checkHazards(pos, pathIdx);
+    grip *= currentHazardGrip;
+    grip = clamp(grip, 0.03, 0.92);
 
     /* --- 重力对车头的横向拉扯（上/下坡都会拽偏） --- */
     if (Math.abs(pitchSin) > 0.03){
@@ -1372,6 +1442,23 @@ function mulberry32(a){
     }, true);
   }
 
+  /* 快速找最近路径点索引 */
+  function nearestPathIndex(pos){
+    if (!track) return 0;
+    const pts = track.pd.pts;
+    let best = 0, bestD = Infinity;
+    // 从上次位置附近搜索（比全量搜索快得多）
+    const start = Math.max(0, (game._lastPathIdx || 0) - 5);
+    const end = Math.min(pts.length, start + 30);
+    for (let i = start; i < end; i++){
+      const dx = pos.x - pts[i].x, dz = pos.z - pts[i].z;
+      const d = dx*dx + dz*dz;
+      if (d < bestD){ bestD = d; best = i; }
+    }
+    game._lastPathIdx = best;
+    return best;
+  }
+
   /* ---------------------------- 13. 进度 / 判定 ---------------------------- */
   let pendingCrash = null;
 
@@ -1441,6 +1528,10 @@ function mulberry32(a){
 
     // 坑
     checkPotholes(pos, spd);
+
+    // 落石
+    const pathIdx = nearestPathIndex(pos);
+    checkRockCollision(pos, pathIdx);
 
     // 通关
     if (game.cornersPassed >= CONFIG.race.targetCorners){
@@ -1546,6 +1637,329 @@ function mulberry32(a){
           shake(0.35);
         }
         return;
+      }
+    }
+  }
+
+  /* ---------------------------- 14b. 天气系统 ---------------------------- */
+  let weather = {
+    type: 'clear',         // clear / rain / fog / ice
+    next: 'clear',
+    gripMul: 1.0,          // 当前抓地系数（平滑过渡用）
+    targetGripMul: 1.0,
+    visDist: 240,          // 当前能见度
+    targetVisDist: 240,
+    transitionT: 0,        // 过渡进度
+    inTransition: false
+  };
+  let rainParticles = null;
+
+  function weatherGripMul(type){
+    const w = CONFIG.weather;
+    if (type === 'rain') return w.rainGripMul;
+    if (type === 'ice') return w.iceGripMul;
+    return 1.0;
+  }
+  function weatherVisDist(type){
+    const w = CONFIG.weather;
+    if (type === 'rain') return w.rainVisDist;
+    if (type === 'fog') return w.fogVisDist;
+    if (type === 'ice') return w.iceVisDist;
+    return w.clearVisDist;
+  }
+  function weatherLabel(type){
+    return { clear:'晴', rain:'雨', fog:'雾', ice:'冰' }[type] || '';
+  }
+
+  function pickNextWeather(){
+    const types = CONFIG.weather.types;
+    let next;
+    do { next = types[Math.floor(Math.random() * types.length)]; }
+    while (next === weather.type);
+    return next;
+  }
+
+  function startWeatherTransition(newType){
+    weather.next = newType;
+    weather.targetGripMul = weatherGripMul(newType);
+    weather.targetVisDist = weatherVisDist(newType);
+    weather.inTransition = true;
+    weather.transitionT = 0;
+  }
+
+  function updateWeather(dt){
+    if (!CONFIG.weather.enable) return;
+
+    if (weather.inTransition){
+      weather.transitionT += dt / CONFIG.weather.transitionSec;
+      const t = clamp(weather.transitionT, 0, 1);
+      // 用 smoothstep 过渡
+      const s = t * t * (3 - 2 * t);
+      weather.gripMul = lerp(weather.gripMul, weather.targetGripMul, s * 0.1 + 0.02);
+      weather.visDist = lerp(weather.visDist, weather.targetVisDist, s * 0.1 + 0.02);
+      if (t >= 1){
+        weather.type = weather.next;
+        weather.gripMul = weather.targetGripMul;
+        weather.visDist = weather.targetVisDist;
+        weather.inTransition = false;
+        applyWeatherVisuals();
+      }
+    }
+
+    // 更新雾
+    if (scene.fog){
+      scene.fog.far = weather.visDist;
+      scene.fog.near = weather.visDist * 0.15;
+    }
+
+    // 雨粒子
+    if (rainParticles){
+      const visible = (weather.type === 'rain' || weather.next === 'rain');
+      rainParticles.visible = visible;
+      if (visible){
+        const pos = bodyPos();
+        rainParticles.position.set(pos.x, pos.y + 8, pos.z);
+        // 雨滴下落动画
+        const positions = rainParticles.geometry.attributes.position;
+        for (let i = 1; i < positions.count; i++){
+          positions.setY(i, positions.getY(i) - dt * 30);
+          if (positions.getY(i) < -6) positions.setY(i, 8 + Math.random() * 4);
+        }
+        positions.needsUpdate = true;
+      }
+    }
+  }
+
+  function applyWeatherVisuals(){
+    const type = weather.type;
+    // 背景色
+    const bgColors = {
+      clear: 0x070a12, rain: 0x0a1018, fog: 0x1a1e22, ice: 0x0c1218
+    };
+    scene.background = new THREE.Color(bgColors[type] || 0x070a12);
+    const fogColors = {
+      clear: 0x070a12, rain: 0x0a1018, fog: 0x222628, ice: 0x0c1218
+    };
+    scene.fog = new THREE.Fog(fogColors[type] || 0x070a12, weather.visDist * 0.15, weather.visDist);
+
+    // 光照调整
+    const intensities = {
+      clear: { hemi: 0.30, sun: 0.32, head: 4.2 },
+      rain:  { hemi: 0.22, sun: 0.18, head: 5.5 },
+      fog:   { hemi: 0.45, sun: 0.50, head: 2.0 },
+      ice:   { hemi: 0.28, sun: 0.22, head: 4.8 }
+    };
+    const li = intensities[type] || intensities.clear;
+    hemi.intensity = li.hemi;
+    sun.intensity = li.sun;
+    headL.intensity = li.head;
+    headR.intensity = li.head;
+
+    // 天气提示
+    const tips = {
+      rain: '下雨了。路面不会等你适应。',
+      fog:  '起雾了。你只能看见三秒后的弯。',
+      ice:  '结冰了。方向盘只是一个建议。',
+      clear:'天晴了。这不算好消息。'
+    };
+    if (tips[type]) Taunt.push(tips[type]);
+  }
+
+  function buildRainParticles(){
+    if (rainParticles){
+      scene.remove(rainParticles);
+      rainParticles.geometry.dispose();
+      rainParticles.material.dispose();
+    }
+    const N = 600;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++){
+      pos[i*3]   = (Math.random() - 0.5) * 50;
+      pos[i*3+1] = Math.random() * 16;
+      pos[i*3+2] = (Math.random() - 0.5) * 50;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0x8899aa, size: 0.12, transparent: true, opacity: 0.5,
+      depthWrite: false, fog: false
+    });
+    rainParticles = new THREE.Points(geo, mat);
+    rainParticles.visible = false;
+    rainParticles.frustumCulled = false;
+    scene.add(rainParticles);
+  }
+
+  /* ---------------------------- 14c. 路面陷阱 ---------------------------- */
+  let hazards = { ice: [], oil: [], rocks: [] };
+  let hazardMeshes = { ice: null, oil: null, rocks: [] };
+
+  function generateHazards(pd, rand){
+    const h = CONFIG.hazards;
+    const result = { ice: [], oil: [], rocks: [] };
+
+    // 冰面：在某段路径上铺一条冰带
+    for (let i = 0; i < h.icePatchCount; i++){
+      const idx = Math.floor(rand() * (pd.pts.length - 60)) + 30;
+      const lat = (rand() * 2 - 1) * (CONFIG.track.halfWidth - 2);
+      result.ice.push({ idx, lat, len: h.icePatchLen });
+    }
+    // 油渍
+    for (let i = 0; i < h.oilSlickCount; i++){
+      const idx = Math.floor(rand() * (pd.pts.length - 60)) + 30;
+      const lat = (rand() * 2 - 1) * (CONFIG.track.halfWidth - 2);
+      result.oil.push({ idx, lat, len: h.oilSlickLen });
+    }
+    // 落石
+    for (let i = 0; i < h.rockCount; i++){
+      const idx = Math.floor(rand() * (pd.pts.length - 60)) + 30;
+      const lat = (rand() * 2 - 1) * (CONFIG.track.halfWidth - 1.5);
+      result.rocks.push({ idx, lat, r: h.rockRadius + rand() * 0.3 });
+    }
+    return result;
+  }
+
+  function buildHazardVisuals(pd, hz){
+    // 清理旧的
+    for (const key of ['ice','oil']){
+      if (hazardMeshes[key]){
+        scene.remove(hazardMeshes[key]);
+        hazardMeshes[key].geometry.dispose();
+        hazardMeshes[key].material.dispose();
+      }
+      hazardMeshes[key] = null;
+    }
+    for (const r of hazardMeshes.rocks){
+      scene.remove(r);
+      r.geometry.dispose();
+      r.material.dispose();
+    }
+    hazardMeshes.rocks = [];
+
+    const halfW = CONFIG.track.halfWidth;
+    const sample = CONFIG.track.sample;
+
+    // 冰面：蓝白色半透明长条
+    const iceGeo = new THREE.PlaneGeometry(halfW * 1.8, 1);
+    iceGeo.rotateX(-Math.PI / 2);
+    const iceMat = new THREE.MeshStandardMaterial({
+      color: 0xa0c8e0, roughness: 0.1, metalness: 0.3,
+      transparent: true, opacity: 0.45,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
+    });
+    const iceInst = new THREE.InstancedMesh(iceGeo, iceMat, hz.ice.length);
+    iceInst.frustumCulled = false;
+    const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0,1,0);
+    const sv = new THREE.Vector3(1, 1, 1);
+    hz.ice.forEach((p, k) => {
+      const P = pd.pts[p.idx], R = pd.rights[p.idx];
+      const angle = Math.atan2(R.x, R.z);
+      q.setFromAxisAngle(up, angle);
+      sv.set(1, 1, p.len / 2);
+      mtx.compose(new THREE.Vector3(P.x + R.x*p.lat, P.y + 0.02, P.z + R.z*p.lat), q, sv);
+      iceInst.setMatrixAt(k, mtx);
+    });
+    iceInst.instanceMatrix.needsUpdate = true;
+    scene.add(iceInst);
+    hazardMeshes.ice = iceInst;
+
+    // 油渍：深色椭圆
+    const oilGeo = new THREE.CircleGeometry(1, 16);
+    oilGeo.rotateX(-Math.PI / 2);
+    const oilMat = new THREE.MeshStandardMaterial({
+      color: 0x080606, roughness: 0.05, metalness: 0.6,
+      transparent: true, opacity: 0.75,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3
+    });
+    const oilInst = new THREE.InstancedMesh(oilGeo, oilMat, hz.oil.length);
+    oilInst.frustumCulled = false;
+    hz.oil.forEach((p, k) => {
+      const P = pd.pts[p.idx], R = pd.rights[p.idx];
+      const angle = Math.atan2(R.x, R.z);
+      q.setFromAxisAngle(up, angle);
+      sv.set(p.len * 0.6, 1, p.len * 0.8);
+      mtx.compose(new THREE.Vector3(P.x + R.x*p.lat, P.y + 0.015, P.z + R.z*p.lat), q, sv);
+      oilInst.setMatrixAt(k, mtx);
+    });
+    oilInst.instanceMatrix.needsUpdate = true;
+    scene.add(oilInst);
+    hazardMeshes.oil = oilInst;
+
+    // 落石：深灰色球体
+    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x3a3a38, roughness: 0.9, metalness: 0.1 });
+    hz.rocks.forEach(p => {
+      const P = pd.pts[p.idx], R = pd.rights[p.idx];
+      const rock = new THREE.Mesh(rockGeo, rockMat);
+      rock.scale.setScalar(p.r);
+      rock.position.set(P.x + R.x*p.lat, P.y + p.r * 0.7, P.z + R.z*p.lat);
+      rock.rotation.set(rand() * 3, rand() * 3, rand() * 3);
+      rock.frustumCulled = false;
+      scene.add(rock);
+      hazardMeshes.rocks.push(rock);
+
+      // 物理碰撞体
+      const rockBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+      const rockCol = RAPIER.ColliderDesc.ball(p.r)
+        .setFriction(0.8).setRestitution(0.3);
+      rockCol.setTranslation(P.x + R.x*p.lat, P.y + p.r * 0.7, P.z + R.z*p.lat);
+      world.createCollider(rockCol, rockBody);
+    });
+  }
+
+  // 检查车辆当前是否在某个陷阱上，返回抓地系数
+  let currentHazardGrip = 1.0;
+  function checkHazards(pos, pathIdx){
+    if (!hazards) return 1.0;
+    let gripMul = 1.0;
+    const halfW = CONFIG.track.halfWidth;
+
+    // 冰面
+    for (const p of hazards.ice){
+      if (Math.abs(p.idx - pathIdx) > Math.ceil(p.len / CONFIG.track.sample)) continue;
+      const g = groundAt(pos.x, pos.z, pathIdx, pos.y - 0.888);
+      if (Math.abs(g.lat - p.lat) < halfW && Math.abs(pos.y - g.y) < 1.5){
+        gripMul = Math.min(gripMul, CONFIG.hazards.iceGripMul);
+        break;
+      }
+    }
+    // 油渍
+    for (const p of hazards.oil){
+      if (Math.abs(p.idx - pathIdx) > Math.ceil(p.len / CONFIG.track.sample)) continue;
+      const g = groundAt(pos.x, pos.z, pathIdx, pos.y - 0.888);
+      if (Math.abs(g.lat - p.lat) < halfW * 0.7 && Math.abs(pos.y - g.y) < 1.5){
+        gripMul = Math.min(gripMul, CONFIG.hazards.oilGripMul);
+        break;
+      }
+    }
+    return gripMul;
+  }
+
+  // 落石碰撞检测（在 updateProgress 里调用）
+  let lastRockHit = -99;
+  function checkRockCollision(pos, pathIdx){
+    if (!hazards || !hazards.rocks.length) return;
+    for (const p of hazards.rocks){
+      if (Math.abs(p.idx - pathIdx) > 3) continue;
+      const P = track.pd.pts[p.idx], R = track.pd.rights[p.idx];
+      const rx = P.x + R.x*p.lat, rz = P.z + R.z*p.lat;
+      const dx = pos.x - rx, dz = pos.z - rz;
+      if (dx*dx + dz*dz < (p.r + 1.0) * (p.r + 1.0)){
+        if (game.playTime - lastRockHit < 1.0) return;
+        lastRockHit = game.playTime;
+        const v = chassisBody.linvel();
+        const spd = Math.hypot(v.x, v.y, v.z);
+        if (spd > 6){
+          // 撞到落石：冲击 + 判定撞车
+          const nx = dx / (Math.hypot(dx, dz) || 1), nz = dz / (Math.hypot(dx, dz) || 1);
+          chassisBody.applyImpulse({
+            x: nx * CONFIG.hazards.rockImpulse,
+            y: CONFIG.hazards.rockImpulse * 0.3,
+            z: nz * CONFIG.hazards.rockImpulse
+          }, true);
+          shake(0.7);
+          triggerCrash('crash');
+        }
       }
     }
   }
@@ -1811,6 +2225,26 @@ function mulberry32(a){
     potholes = makePotholes(pd, Math.floor(pts.length * 0.02), mulberry32(CONFIG.track.seed + 7));
     buildPotholeVisuals(pd, potholes);
 
+    // 路面陷阱
+    if (CONFIG.hazards.enable){
+      hazards = generateHazards(pd, mulberry32(CONFIG.track.seed + 99));
+      buildHazardVisuals(pd, hazards);
+    }
+
+    // 天气系统初始化
+    if (CONFIG.weather.enable){
+      weather.type = 'clear';
+      weather.next = 'clear';
+      weather.gripMul = 1.0;
+      weather.targetGripMul = 1.0;
+      weather.visDist = CONFIG.weather.clearVisDist;
+      weather.targetVisDist = CONFIG.weather.clearVisDist;
+      weather.inTransition = false;
+      weatherTimer = CONFIG.weather.firstChangeSec;
+      buildRainParticles();
+      applyWeatherVisuals();
+    }
+
     const p = pd.pts[4];
     const q = quatFromForward(pd.tangents[4]);
     chassisBody.setTranslation({ x:p.x, y:p.y + 1.15, z:p.z }, true);
@@ -1854,12 +2288,22 @@ function mulberry32(a){
     '方向盘知道你在想什么。它不在乎。'
   ];
 
+  let weatherTimer = 0;
+
   function updateLevel2(dt){
     // 随机旁白
     ambientTimer -= dt;
     if (ambientTimer <= 0){
       ambientTimer = 26 + Math.random() * 22;
       Taunt.push(AMBIENT[Math.floor(Math.random() * AMBIENT.length)]);
+    }
+    // 天气切换
+    if (CONFIG.weather.enable && !weather.inTransition){
+      weatherTimer -= dt;
+      if (weatherTimer <= 0){
+        startWeatherTransition(pickNextWeather());
+        weatherTimer = CONFIG.weather.intervalMin + Math.random() * (CONFIG.weather.intervalMax - CONFIG.weather.intervalMin);
+      }
     }
     // 第 37 弯
     if (game.cornersPassed === 37 && !passed37){
@@ -2172,6 +2616,8 @@ function mulberry32(a){
     setTimeout(()=>{ if (my !== titleToken) return; titleCard.classList.add('hidden'); }, 2400);
   }
 
+  const weatherTagEl = document.getElementById('weatherTag');
+
   function updateHud(){
     const v = chassisBody ? chassisBody.linvel() : {x:0,y:0,z:0};
     const spd = Math.hypot(v.x, v.y, v.z) * 3.6;
@@ -2183,6 +2629,12 @@ function mulberry32(a){
       rageVal.textContent = Math.round(game.rage);
       rageBar.style.width = game.rage + '%';
     }
+
+    // 天气标签
+    const icons = { clear:'☀', rain:'🌧', fog:'🌫', ice:'❄' };
+    const wt = weather.inTransition ? weather.next : weather.type;
+    weatherTagEl.textContent = (icons[wt] || '') + ' ' + weatherLabel(wt);
+    weatherTagEl.className = 'weather-tag ' + (wt !== 'clear' ? wt : '');
   }
 
   /* ---------------------------- 23. 主循环 ---------------------------- */
@@ -2221,6 +2673,7 @@ function mulberry32(a){
       if (steps === CONFIG.world.maxSubSteps) acc = 0;
 
       updateProgress(dt);
+      updateWeather(dt);
       if (state === State.L1) updateLevel1(dt);
       else if (state === State.L2) updateLevel2(dt);
 
