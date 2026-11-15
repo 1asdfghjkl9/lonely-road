@@ -287,30 +287,30 @@ const CONFIG = {
       stiffness: 36000,                    // 弹簧刚度 N/m
       damping: 3400                        // 阻尼 N·s/m
     },
-    engineForce: 9000,                     // 发动机推力（牛）；太大会抬车头翻车
-    brakeForce: 15000,                     // 刹车力
-    dragCoef: 3.4,                         // 空气阻力系数（决定极速）
-    maxSteer: 0.62,                        // 低速最大前轮转角（弧度）
-    steerSpeedFalloff: 0.048,              // 速度对转角的衰减
-    gripNormal: 0.58,                      // 正常横向抓地（摩擦圆系数 μ，越大越黏）
-    gripHandbrake: 0.10,                   // 手刹抓地
-    rollCenter: 0.30,                      // 侧向力作用点距路面高度，越小越不容易翻车
+    engineForce: 7200,                     // 发动机推力 —— 降低，加速更慢
+    brakeForce: 12000,                     // 刹车力 —— 降低，刹车距离更长
+    dragCoef: 4.2,                         // 空气阻力 —— 增加，极速更低
+    maxSteer: 0.54,                        // 低速最大前轮转角（弧度）—— 缩小转角范围
+    steerSpeedFalloff: 0.065,              // 速度对转角的衰减 —— 高速转向更弱
+    gripNormal: 0.42,                      // 正常横向抓地 —— 大幅降低，默认就滑
+    gripHandbrake: 0.06,                   // 手刹抓地 —— 几乎无抓地
+    rollCenter: 0.42,                      // 侧向力作用点抬高 —— 更容易翻车
   },
 
   /* --- 反人类手感（第二关核心） --- */
   hell: {
-    steerDelay: 0.20,        // ★ 转向响应延迟（秒）：你打方向，车 0.2 秒后才理你
-    uphillSteerPenalty: 0.72,// ★ 上坡时转向力衰减比例（爬坡方向盘变哑）
-    gravitySteerPull: 2.6,   // ★ 重力对车头的横向拉扯强度（上下坡都会拽偏）
-    downhillGripLoss: 0.42,  // ★ 下坡刹车时额外损失的抓地（打滑）
-    downhillBrakeLoss: 0.45, // ★ 下坡时刹车效能折损
-    potholeSpeedSafe: 11,    // 低于这个速度过坑只是颠一下
-    potholeSpeedFlip: 24,    // 高于这个速度过坑大概率翻
-    potholeImpulse: 5200,    // 过坑冲击力
-    crashDeltaV: 9.5,        // 单帧速度突变超过这个值判定为撞击
-    flipUpDot: 0.30,         // 车顶朝上分量低于此值算翻车
-    flipHold: 0.55,          // 持续多少秒判定翻车
-    offRoadMargin: 0.35       // 超出路面边缘多少米算冲出公路
+    steerDelay: 0.28,        // ★ 转向响应延迟 —— 更迟钝
+    uphillSteerPenalty: 0.82,// ★ 上坡转向衰减 —— 更哑
+    gravitySteerPull: 3.5,   // ★ 重力横向拉扯 —— 更强
+    downhillGripLoss: 0.58,  // ★ 下坡抓地损失 —— 更滑
+    downhillBrakeLoss: 0.55, // ★ 下坡刹车折损 —— 更刹不住
+    potholeSpeedSafe: 8,     // 低于这个速度过坑安全 —— 更低
+    potholeSpeedFlip: 18,    // 高于这个速度过坑翻车 —— 更低
+    potholeImpulse: 6500,    // 过坑冲击力 —— 更大
+    crashDeltaV: 6.5,        // 撞击判定阈值 —— 更容易判定撞车
+    flipUpDot: 0.42,         // 翻车判定 —— 更容易翻
+    flipHold: 0.35,          // 翻车持续时间 —— 更快判定
+    offRoadMargin: 0.15      // 路肩余量 —— 几乎没有宽容
   },
 
   /* --- 赛制 --- */
@@ -323,13 +323,13 @@ const CONFIG = {
 
   /* --- 暴躁值 --- */
   rage: {
-    perCrash: 15,
-    perFlip: 22,
-    decayPerSec: 3.4,        // 无失误时的自然消退
+    perCrash: 20,
+    perFlip: 28,
+    decayPerSec: 2.2,        // 暴躁消退更慢
     max: 100,
-    crashSensitivity: 0.45,  // 暴躁值满时撞击判定阈值收紧的比例
-    gripPenalty: 0.22,       // 暴躁值满时抓地损失
-    delayPenalty: 0.06       // 暴躁值满时转向延迟额外增加（秒）
+    crashSensitivity: 0.55,  // 满暴躁时撞击阈值收紧更多
+    gripPenalty: 0.32,       // 满暴躁时抓地损失更大
+    delayPenalty: 0.10       // 满暴躁时转向延迟额外增加更多
   },
 
   /* --- 嘲讽 --- */
@@ -341,7 +341,7 @@ const CONFIG = {
 
   /* --- 赛道 --- */
   track: {
-    halfWidth: 6.2,          // 半路宽（米）
+    halfWidth: 5.0,          // 半路宽 —— 收窄路面
     sample: 2.5,             // 路面采样间距
     seed: 20261112,
     colliderExtra: 0.8       // 物理地面比视觉路面宽出的米数（留一点路肩，别让车身骑在边线上被勾住）
@@ -350,45 +350,42 @@ const CONFIG = {
   /* --- 渐进式难度 --- */
   progressive: {
     enable: true,
-    // 弯道半径随进度递减：前 50 弯用正常范围，之后逐步收紧
-    radiusShrinkPer50: 3.0,  // 每 50 弯，最小/最大半径各减这么多
-    minRadiusFloor: 9,       // 半径下限，不能再小了（小于半路宽路面会折叠）
-    // 路宽随进度递减
-    halfWidthShrinkPer50: 0.5, // 每 50 弯半路宽减 0.5m
-    minHalfWidth: 4.0,         // 半路宽下限
-    // 后期弯道类型概率偏移：越往后急弯和盲弯越多
-    hairpinBiasStart: 80,   // 第 80 弯开始增加发卡弯概率
-    blindBiasStart: 120     // 第 120 弯开始增加盲弯概率
+    radiusShrinkPer50: 4.5,
+    minRadiusFloor: 7,
+    halfWidthShrinkPer50: 0.6,
+    minHalfWidth: 3.5,
+    hairpinBiasStart: 50,
+    blindBiasStart: 80
   },
 
   /* --- 动态天气 --- */
   weather: {
     enable: true,
-    changeEvery: 22,        // 每 N 个弯可能换天气
+    changeEvery: 22,
     types: ['clear', 'rain', 'fog', 'ice'],
-    rainGripMul: 0.55,      // 雨天抓地系数
-    iceGripMul: 0.20,       // 冰面抓地系数
-    rainVisDist: 140,       // 雨天能见度
-    fogVisDist: 55,         // 雾天能见度
-    iceVisDist: 100,        // 冰面能见度
-    clearVisDist: 240,      // 晴天能见度（夜晚基线）
-    transitionSec: 3.0,     // 天气过渡时间
-    firstChangeSec: 30,     // 第一次天气切换时间
-    intervalMin: 35,        // 天气切换间隔下限
-    intervalMax: 70         // 天气切换间隔上限
+    rainGripMul: 0.38,
+    iceGripMul: 0.12,
+    rainVisDist: 100,
+    fogVisDist: 38,
+    iceVisDist: 75,
+    clearVisDist: 200,
+    transitionSec: 2.0,
+    firstChangeSec: 20,
+    intervalMin: 22,
+    intervalMax: 45
   },
 
   /* --- 路面陷阱 --- */
   hazards: {
-    icePatchCount: 14,      // 冰面数量
-    icePatchLen: 12,        // 冰面沿赛道长度（米）
-    iceGripMul: 0.12,       // 冰面抓地
-    oilSlickCount: 10,      // 油渍数量
-    oilSlickLen: 8,         // 油渍长度
-    oilGripMul: 0.22,       // 油渍抓地
-    rockCount: 8,           // 落石数量
-    rockRadius: 0.7,        // 落石碰撞半径
-    rockImpulse: 6000       // 撞落石冲击力
+    icePatchCount: 22,
+    icePatchLen: 16,
+    iceGripMul: 0.06,
+    oilSlickCount: 16,
+    oilSlickLen: 10,
+    oilGripMul: 0.12,
+    rockCount: 14,
+    rockRadius: 0.8,
+    rockImpulse: 8000
   }
 };
 
