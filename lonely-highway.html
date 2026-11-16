@@ -151,7 +151,8 @@
     .hud-bottom{ padding:0 16px 16px; flex-wrap:wrap; }
     .speedo .num{ font-size:38px; }
     .rage{ width:120px; }
-    #toasts{ left:16px; bottom:150px; width:min(320px,72vw); }
+    #toasts{ left:50%; transform:translateX(-50%); bottom:24px; width:min(380px,88vw); }
+    .toast{ border-left:none; border-top:2px solid var(--accent); text-align:center; }
   }
   @media print{ body{ background:#fff; color:#000; } canvas{ display:none; } }
 
