@@ -48,6 +48,30 @@
   .weather-tag.fog{ background:rgba(180,180,170,.18); color:#ccc8c0; }
   .weather-tag.ice{ background:rgba(140,190,220,.22); color:#b0d8f0; }
 
+  #modeSelect{
+    position:fixed; inset:0; z-index:50; display:none;
+    flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(5,7,10,.92); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  }
+  #modeSelect.on{ display:flex; }
+  #modeSelect .ms-title{ font-size:28px; letter-spacing:.12em; color:var(--ink); margin-bottom:8px; font-weight:600; }
+  #modeSelect .ms-sub{ font-size:13px; color:var(--dim); letter-spacing:.1em; margin-bottom:36px; }
+  #modeSelect .ms-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:560px; }
+  #modeSelect .ms-card{
+    display:block; width:240px; padding:24px 20px; cursor:pointer;
+    border:1px solid var(--line); border-radius:8px; background:rgba(8,10,14,.5);
+    transition:all .2s ease; text-align:center; pointer-events:auto;
+  }
+  #modeSelect .ms-card:hover{ border-color:var(--ink); background:rgba(20,22,28,.6); transform:translateY(-2px); }
+  #modeSelect .ms-card.deadly{ border-color:rgba(224,89,46,.3); }
+  #modeSelect .ms-card.deadly:hover{ border-color:var(--accent); background:rgba(40,16,10,.5); }
+  #modeSelect .ms-card .mc-name{ font-size:18px; font-weight:600; letter-spacing:.04em; margin-bottom:6px; color:var(--ink); }
+  #modeSelect .ms-card.deadly .mc-name{ color:var(--accent); }
+  #modeSelect .ms-card .mc-desc{ font-size:12px; color:var(--dim); line-height:1.6; }
+  #modeSelect .ms-card .mc-tag{ display:inline-block; font-size:10px; padding:2px 8px; border-radius:2px; margin-top:8px; letter-spacing:.1em; }
+  #modeSelect .ms-card .mc-tag.normal{ background:rgba(236,233,227,.08); color:var(--dim); }
+  #modeSelect .ms-card .mc-tag.hell{ background:rgba(224,89,46,.15); color:var(--accent); }
+
   .progress{ flex:1; max-width:520px; }
   .progress .label{ display:flex; justify-content:space-between; font-size:12px; color:var(--dim); letter-spacing:.1em; margin-bottom:8px; }
   .bar{ height:2px; background:rgba(236,233,227,.12); position:relative; overflow:hidden; }
@@ -194,7 +218,9 @@
       <b id="levelName">第一关 · 直道</b>
     </div>
     <div class="hud-right">
-      <span id="weatherTag" class="weather-tag">☀ 晴</span><br>
+      <span id="weatherTag" class="weather-tag">☀ 晴</span>
+      <span id="deadlyTag" class="weather-tag" style="display:none;background:rgba(224,89,46,.2);color:#e0592e;">🔧 油门焊死</span>
+      <span id="reverseTag" class="weather-tag" style="display:none;background:rgba(224,89,46,.3);color:#ff6b3d;">⚠ 方向盘反转</span><br>
       <kbd>W</kbd><kbd>↑</kbd> 油门　<kbd>S</kbd><kbd>↓</kbd> 刹车<br>
       <kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> 转向　<kbd>空格</kbd> 手刹<br>
       <kbd>R</kbd> 重新开始
@@ -246,6 +272,33 @@
   <div class="pedal brake" id="btnBrake">刹车</div>
   <div class="tbtn handbrake" id="btnHb">手刹</div>
   <div class="tbtn reset" id="btnRst">复位</div>
+</div>
+
+<div id="modeSelect">
+  <div class="ms-title">选择你的地狱</div>
+  <div class="ms-sub">通过第一关后，请选择第二关模式</div>
+  <div class="ms-grid">
+    <div class="ms-card" data-mode="normal200">
+      <div class="mc-name">200 弯</div>
+      <div class="mc-desc">200 个弯道。天气、陷阱、渐进难度。撞车从头来。</div>
+      <div class="mc-tag normal">标准</div>
+    </div>
+    <div class="ms-card" data-mode="normal2000">
+      <div class="mc-name">2000 弯</div>
+      <div class="mc-desc">2000 个弯道。路永远不结束。你需要的是耐性，或者放弃。</div>
+      <div class="mc-tag normal">耐力</div>
+    </div>
+    <div class="ms-card deadly" data-mode="deadly200">
+      <div class="mc-name">夺命 200 弯</div>
+      <div class="mc-desc">每过几个弯，方向盘反转。油门焊死。刹车是你唯一的朋友。</div>
+      <div class="mc-tag hell">夺命</div>
+    </div>
+    <div class="ms-card deadly" data-mode="deadly2000">
+      <div class="mc-name">夺命 2000 弯</div>
+      <div class="mc-desc">2000 弯 + 方向盘反转 + 油门焊死。你不该选这个。</div>
+      <div class="mc-tag hell">地狱</div>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -1028,8 +1081,27 @@ function mulberry32(a){
   }
 
   /* ---------------------------- 10. 游戏状态 ---------------------------- */
-  const State = { TITLE:0, L1:1, L2:2, ENDING:3, DONE:4 };
+  const State = { TITLE:0, L1:1, L2:2, ENDING:3, DONE:4, MODE_SELECT:5 };
   let state = State.TITLE;
+
+  // 游戏模式：normal200 / normal2000 / deadly200 / deadly2000
+  let gameMode = 'normal200';
+  const MODE_CONFIG = {
+    normal200:   { corners: 200,  deadly: false },
+    normal2000:  { corners: 2000, deadly: false },
+    deadly200:   { corners: 200,  deadly: true  },
+    deadly2000:  { corners: 2000, deadly: true  }
+  };
+
+  // 夺命模式状态
+  const deadly = {
+    steerReversed: false,       // 当前方向盘是否反转
+    throttleLocked: false,      // 油门是否焊死
+    reverseEveryCorners: 5,     // 每过几个弯反转一次方向盘
+    nextReverseAt: 5,           // 下次反转在第几个弯
+    reverseTimer: 0,            // 反转持续时间计时（用于视觉提示）
+    reverseDuration: 3.0        // 反转提示显示时长
+  };
 
   const game = {
     playTime: 0,          // 真实计时（秒）
@@ -1098,6 +1170,15 @@ function mulberry32(a){
     if (right) s += 1;
     // 键盘有输入时优先键盘，否则取摇杆模拟量
     input.steer = s !== 0 ? s : touchInput.steer;
+
+    // 夺命模式：油门焊死
+    if (deadly.throttleLocked){
+      input.throttle = 1;
+    }
+    // 夺命模式：方向盘反转
+    if (deadly.steerReversed){
+      input.steer = -input.steer;
+    }
 
     // 记录原始转向 + 时间戳，用于延迟队列（按真实时间取，不按帧数）
     const nowT = performance.now() / 1000;
@@ -1531,7 +1612,7 @@ function mulberry32(a){
     checkRockCollision(pos, pathIdx);
 
     // 通关
-    if (game.cornersPassed >= CONFIG.race.targetCorners){
+    if (game.cornersPassed >= getModeTargetCorners()){
       finishRace();
       return;
     }
@@ -2022,6 +2103,13 @@ function mulberry32(a){
     steerAngle = 0;
     steerHistory.length = 0;
     camLerp = 0;
+
+    // 夺命模式：撞车后重置反转状态
+    if (deadly.throttleLocked){
+      deadly.steerReversed = false;
+      deadly.nextReverseAt = deadly.reverseEveryCorners;
+      deadly.reverseTimer = 0;
+    }
   }
 
   function quatFromForward(fwd){
@@ -2180,19 +2268,41 @@ function mulberry32(a){
   function finishLevel1(){
     if (level1Done) return;
     level1Done = true;
-    state = State.TITLE;          // 冻结驾驶，进入过场
+    state = State.MODE_SELECT;
     Taunt.push('恭喜。你证明了你会直走。');
     setTimeout(()=>{
-      showTitleCard('第二关 · 地狱弯道', '累计通过 ' + CONFIG.race.targetCorners + ' 个弯');
-      setTimeout(()=>{
-        level1Done = false;
-        startLevel2();
-      }, 2200);
-    }, 2600);
+      showModeSelect();
+    }, 1800);
   }
 
+  /* ---- 模式选择 ---- */
+  const modeSelectEl = document.getElementById('modeSelect');
+
+  function showModeSelect(){
+    modeSelectEl.classList.add('on');
+  }
+
+  function hideModeSelect(){
+    modeSelectEl.classList.remove('on');
+  }
+
+  modeSelectEl.querySelectorAll('.ms-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const mode = card.dataset.mode;
+      if (!MODE_CONFIG[mode]) return;
+      gameMode = mode;
+      hideModeSelect();
+      setTimeout(()=> startLevel2(mode), 300);
+    });
+  });
+
   /* ---------------------------- 18. 关卡二 ---------------------------- */
-  function startLevel2(){
+  function startLevel2(mode){
+    gameMode = mode || gameMode || 'normal200';
+    const mc = MODE_CONFIG[gameMode];
+    const targetCorners = mc.corners;
+    const isDeadly = mc.deadly;
+
     state = State.L2;
     Taunt.clear();
     resetRaceStats();
@@ -2202,12 +2312,17 @@ function mulberry32(a){
     hudEl.classList.remove('hidden');
     resetEndScene();
 
-    // 生成 + 自交校验：随机赛道有概率绕回来压到自己身上，
-    // 那就换一个 seed 重掷，取分离度最高的那一次。
+    // 夺命模式初始化
+    deadly.steerReversed = false;
+    deadly.throttleLocked = isDeadly;
+    deadly.nextReverseAt = deadly.reverseEveryCorners;
+    deadly.reverseTimer = 0;
+
+    // 生成赛道（弯道数按模式决定）
     const needSep = CONFIG.track.halfWidth * 2 + 6;
     let bestPts = null, bestApex = null, bestSep = -1;
     for (let k = 0; k < 5; k++){
-      const gen = generateTrack(CONFIG.race.targetCorners, CONFIG.track.seed + k * 101);
+      const gen = generateTrack(targetCorners, CONFIG.track.seed + k * 101);
       const cand = sampleSpline(gen.ctrl, CONFIG.track.sample);
       const sep = minSelfSeparation(cand);
       if (sep > bestSep){ bestSep = sep; bestPts = cand; bestApex = gen.apexes; }
@@ -2263,10 +2378,24 @@ function mulberry32(a){
     sun.color.setHex(0x8ea6d0);
     headL.intensity = 4.2; headR.intensity = 4.2;
 
-    setHudLevel('第二关 · 地狱弯道', false);
-    showTitleCard('第二关 · 地狱弯道', '累计通过 ' + CONFIG.race.targetCorners + ' 个弯道');
+    setHudLevel(getModeLabel(gameMode), false);
+    showTitleCard(getModeLabel(gameMode), '累计通过 ' + targetCorners + ' 个弯道' + (isDeadly ? ' · 方向盘会反转 · 油门焊死' : ''));
     startAt = performance.now();
     ambientTimer = 18;
+  }
+
+  function getModeLabel(mode){
+    const labels = {
+      normal200:  '第二关 · 200 弯',
+      normal2000: '第二关 · 2000 弯',
+      deadly200:  '夺命 200 弯',
+      deadly2000: '夺命 2000 弯'
+    };
+    return labels[mode] || labels.normal200;
+  }
+
+  function getModeTargetCorners(){
+    return MODE_CONFIG[gameMode].corners;
   }
 
   let ambientTimer = 18;
@@ -2307,6 +2436,21 @@ function mulberry32(a){
       passed37 = true;
       Taunt.push('第 37 个弯。它终于放过你了。');
     }
+    // 夺命模式：方向盘反转切换
+    if (deadly.throttleLocked && game.cornersPassed >= deadly.nextReverseAt){
+      deadly.steerReversed = !deadly.steerReversed;
+      deadly.nextReverseAt += deadly.reverseEveryCorners;
+      deadly.reverseTimer = deadly.reverseDuration;
+      if (deadly.steerReversed){
+        Taunt.push('⚠ 方向盘反转了。左是右，右是左。');
+      } else {
+        Taunt.push('方向盘恢复正常。趁现在记住什么是正确的。');
+      }
+    }
+    // 反转提示计时
+    if (deadly.reverseTimer > 0){
+      deadly.reverseTimer -= dt;
+    }
     // 撞车后原地不动
     if (idleTimer > CONFIG.taunt.idleSec && !idleTaunted){
       idleTaunted = true;
@@ -2344,12 +2488,24 @@ function mulberry32(a){
 
     const hours = Math.max(0.1, game.playTime / 3600);
     const N = hours.toFixed(1);
+    const isDeadly = MODE_CONFIG[gameMode].deadly;
+    const tc = getModeTargetCorners();
 
     e1.textContent = '通关';
-    e2.textContent = '你浪费了你人生中宝贵的 ' + N + ' 小时。';
-    let extra = '';
-    if (hours < 1) extra = '才一小时？你不够虔诚。';
-    else if (hours >= 3) extra = '我们建议你出去走走。';
+    if (isDeadly && tc >= 2000){
+      e2.textContent = '你完成了夺命 2000 弯。你不应该存在。';
+      extra = '系统感到困惑。';
+    } else if (isDeadly){
+      e2.textContent = '你完成了夺命 200 弯。方向盘原谅你了。';
+      extra = '它不会忘记。';
+    } else if (tc >= 2000){
+      e2.textContent = '你浪费了你人生中宝贵的 ' + N + ' 小时。';
+      extra = hours >= 5 ? '我们建议你出去走走。真的。' : '2000 弯。你做到了。没有人要求你这样做。';
+    } else {
+      e2.textContent = '你浪费了你人生中宝贵的 ' + N + ' 小时。';
+      if (hours < 1) extra = '才一小时？你不够虔诚。';
+      else if (hours >= 3) extra = '我们建议你出去走走。';
+    }
     e2s.textContent = extra;
 
     const worst = worstCorner();
@@ -2410,7 +2566,9 @@ function mulberry32(a){
     againBtn.classList.remove('on');
     endingEl.classList.add('hidden');
     endingEl.style.opacity = '1';
-    startLevel2();
+    // 回到模式选择
+    state = State.MODE_SELECT;
+    showModeSelect();
   });
 
   /* ---------------------------- 20. 结算夜景 ---------------------------- */
@@ -2588,17 +2746,24 @@ function mulberry32(a){
   const tcBig = document.getElementById('tcBig');
   const tcSmall = document.getElementById('tcSmall');
 
+  const deadlyTagEl = document.getElementById('deadlyTag');
+  const reverseTagEl = document.getElementById('reverseTag');
+
   function setHudLevel(name, isL1){
     levelNameEl.textContent = name;
     if (isL1){
       progressWrap.style.visibility = 'hidden';
       rageWrap.style.visibility = 'hidden';
+      deadlyTagEl.style.display = 'none';
+      reverseTagEl.style.display = 'none';
     } else {
       progressWrap.style.visibility = 'visible';
       rageWrap.style.visibility = 'visible';
       progLabel.textContent = '弯道';
-      progVal.textContent = '0 / ' + CONFIG.race.targetCorners;
+      progVal.textContent = '0 / ' + getModeTargetCorners();
       progBar.style.width = '0%';
+      // 夺命模式标签
+      deadlyTagEl.style.display = deadly.throttleLocked ? 'inline-block' : 'none';
     }
   }
 
@@ -2621,8 +2786,9 @@ function mulberry32(a){
     spdEl.textContent = Math.round(spd);
 
     if (state === State.L2 || state === State.ENDING){
-      progVal.textContent = game.cornersPassed + ' / ' + CONFIG.race.targetCorners;
-      progBar.style.width = (game.cornersPassed / CONFIG.race.targetCorners * 100) + '%';
+      const tc = getModeTargetCorners();
+      progVal.textContent = game.cornersPassed + ' / ' + tc;
+      progBar.style.width = (game.cornersPassed / tc * 100) + '%';
       rageVal.textContent = Math.round(game.rage);
       rageBar.style.width = game.rage + '%';
     }
@@ -2632,6 +2798,13 @@ function mulberry32(a){
     const wt = weather.inTransition ? weather.next : weather.type;
     weatherTagEl.textContent = (icons[wt] || '') + ' ' + weatherLabel(wt);
     weatherTagEl.className = 'weather-tag ' + (wt !== 'clear' ? wt : '');
+
+    // 夺命模式：反转指示器
+    if (deadly.throttleLocked){
+      reverseTagEl.style.display = deadly.steerReversed ? 'inline-block' : 'none';
+    } else {
+      reverseTagEl.style.display = 'none';
+    }
   }
 
   /* ---------------------------- 23. 主循环 ---------------------------- */
