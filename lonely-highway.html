@@ -71,6 +71,62 @@
   #modeSelect .ms-card .mc-tag{ display:inline-block; font-size:10px; padding:2px 8px; border-radius:2px; margin-top:8px; letter-spacing:.1em; }
   #modeSelect .ms-card .mc-tag.normal{ background:rgba(236,233,227,.08); color:var(--dim); }
   #modeSelect .ms-card .mc-tag.hell{ background:rgba(224,89,46,.15); color:var(--accent); }
+  #modeSelect .ms-footer{ margin-top:28px; display:flex; gap:16px; justify-content:center; }
+  #modeSelect .ms-lb-btn{
+    font-size:13px; letter-spacing:.1em; color:var(--dim); cursor:pointer;
+    padding:8px 24px; border:1px solid rgba(236,233,227,.15); background:transparent;
+    transition:all .25s ease;
+  }
+  #modeSelect .ms-lb-btn:hover{ color:var(--ink); border-color:var(--ink); }
+
+  /* ---- 排行榜面板 ---- */
+  #leaderboard{
+    position:fixed; inset:0; z-index:60; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(2,4,8,.88); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  #leaderboard.on{ display:flex; }
+  #leaderboard .lb-panel{
+    width:min(560px,92vw); max-height:80vh; overflow-y:auto;
+    background:var(--panel); border:1px solid rgba(236,233,227,.08);
+    padding:28px 24px;
+  }
+  #leaderboard .lb-title{ font-size:22px; font-weight:600; letter-spacing:.08em; color:var(--ink); margin-bottom:4px; }
+  #leaderboard .lb-sub{ font-size:12px; color:var(--dim); letter-spacing:.08em; margin-bottom:20px; }
+  #leaderboard .lb-tabs{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  #leaderboard .lb-tab{
+    font-size:11px; padding:4px 12px; border:1px solid rgba(236,233,227,.1);
+    color:var(--dim); cursor:pointer; letter-spacing:.06em; transition:all .2s;
+  }
+  #leaderboard .lb-tab.active{ color:var(--ink); border-color:var(--ink); }
+  #leaderboard .lb-tab.hell.active{ color:var(--accent); border-color:var(--accent); }
+  #leaderboard table{ width:100%; border-collapse:collapse; font-size:12px; }
+  #leaderboard th{ text-align:left; color:var(--dim); font-weight:400; padding:6px 4px; border-bottom:1px solid rgba(236,233,227,.06); letter-spacing:.06em; }
+  #leaderboard td{ padding:7px 4px; color:#b8b5ae; border-bottom:1px solid rgba(236,233,227,.03); }
+  #leaderboard td.rank{ color:var(--dim); width:28px; }
+  #leaderboard tr:nth-child(1) td.rank{ color:#e0b84a; }
+  #leaderboard tr:nth-child(2) td.rank{ color:#c0c0c0; }
+  #leaderboard tr:nth-child(3) td.rank{ color:#cd7f32; }
+  #leaderboard .lb-empty{ text-align:center; color:var(--dim); font-size:13px; padding:32px 0; }
+  #leaderboard .lb-close{
+    margin-top:20px; width:100%; font-size:13px; padding:10px; cursor:pointer;
+    color:var(--dim); border:1px solid rgba(236,233,227,.1); background:transparent;
+    letter-spacing:.1em; transition:all .2s;
+  }
+  #leaderboard .lb-close:hover{ color:var(--ink); border-color:var(--ink); }
+  #leaderboard .lb-name-row{ display:flex; gap:8px; margin-bottom:16px; }
+  #leaderboard .lb-name-input{
+    flex:1; font-size:14px; padding:8px 12px; color:var(--ink);
+    background:rgba(0,0,0,.3); border:1px solid rgba(236,233,227,.1);
+    font-family:inherit; outline:none;
+  }
+  #leaderboard .lb-name-input:focus{ border-color:var(--accent); }
+  #leaderboard .lb-save-btn{
+    font-size:13px; padding:8px 18px; cursor:pointer; color:var(--accent);
+    border:1px solid var(--accent); background:transparent; letter-spacing:.08em; transition:all .2s;
+  }
+  #leaderboard .lb-save-btn:hover{ background:rgba(224,89,46,.1); }
+  #leaderboard .lb-save-btn:disabled{ opacity:.4; cursor:default; }
 
   .progress{ flex:1; max-width:520px; }
   .progress .label{ display:flex; justify-content:space-between; font-size:12px; color:var(--dim); letter-spacing:.1em; margin-bottom:8px; }
@@ -299,6 +355,35 @@
       <div class="mc-desc">2000 弯 + 方向盘反转 + 油门焊死。你不该选这个。</div>
       <div class="mc-tag hell">地狱</div>
     </div>
+  </div>
+  <div class="ms-footer">
+    <button class="ms-lb-btn" id="msLbBtn">排行榜</button>
+  </div>
+</div>
+
+<div id="leaderboard">
+  <div class="lb-panel">
+    <div class="lb-title">排行榜</div>
+    <div class="lb-sub" id="lbSub">本地记录 · 仅供本设备</div>
+    <div class="lb-name-row" id="lbNameRow" style="display:none;">
+      <input class="lb-name-input" id="lbNameInput" type="text" maxlength="12" placeholder="留下你的名字（最多12字）">
+      <button class="lb-save-btn" id="lbSaveBtn">提交</button>
+    </div>
+    <div class="lb-tabs" id="lbTabs">
+      <span class="lb-tab active" data-filter="all">全部</span>
+      <span class="lb-tab" data-filter="normal200">200弯</span>
+      <span class="lb-tab" data-filter="normal2000">2000弯</span>
+      <span class="lb-tab hell" data-filter="deadly200">夺命200</span>
+      <span class="lb-tab hell" data-filter="deadly2000">夺命2000</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>名字</th><th>模式</th><th>用时</th><th>撞车</th><th>翻车</th><th>日期</th></tr>
+      </thead>
+      <tbody id="lbBody"></tbody>
+    </table>
+    <div class="lb-empty" id="lbEmpty" style="display:none;">还没有记录。去跑一圈。</div>
+    <button class="lb-close" id="lbCloseBtn">关闭</button>
   </div>
 </div>
 
@@ -2297,6 +2382,109 @@ function mulberry32(a){
     });
   });
 
+  /* ---- 排行榜 ---- */
+  const LB_KEY = 'lonely_highway_lb';
+  const lbEl = document.getElementById('leaderboard');
+  const lbBody = document.getElementById('lbBody');
+  const lbEmpty = document.getElementById('lbEmpty');
+  const lbCloseBtn = document.getElementById('lbCloseBtn');
+  const lbTabsEl = document.getElementById('lbTabs');
+  const lbNameRow = document.getElementById('lbNameRow');
+  const lbNameInput = document.getElementById('lbNameInput');
+  const lbSaveBtn = document.getElementById('lbSaveBtn');
+  const msLbBtn = document.getElementById('msLbBtn');
+  let lbFilter = 'all';
+  let lbPendingScore = null; // 待提交的成绩
+
+  function lbLoad(){
+    try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function lbSave(list){
+    try { localStorage.setItem(LB_KEY, JSON.stringify(list)); } catch(e){}
+  }
+  function lbAddScore(score){
+    const list = lbLoad();
+    list.push(score);
+    list.sort((a,b)=>{
+      // 用时越短越好
+      if (a.time !== b.time) return a.time - b.time;
+      return a.crashes - b.crashes;
+    });
+    if (list.length > 50) list.length = 50;
+    lbSave(list);
+  }
+  function fmtTime(sec){
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+    if (h > 0) return h + 'h' + String(m).padStart(2,'0') + 'm';
+    return m + ':' + String(s).padStart(2,'0');
+  }
+  function fmtDate(ts){
+    const d = new Date(ts);
+    return (d.getMonth()+1) + '/' + d.getDate();
+  }
+  function renderLeaderboard(){
+    let list = lbLoad();
+    if (lbFilter !== 'all') list = list.filter(r => r.mode === lbFilter);
+    lbBody.innerHTML = '';
+    if (!list.length){
+      lbEmpty.style.display = 'block';
+      return;
+    }
+    lbEmpty.style.display = 'none';
+    list.slice(0, 20).forEach((r, i)=>{
+      const tr = document.createElement('tr');
+      const modeShort = r.mode.startsWith('deadly') ? '夺命' : '';
+      const corners = r.mode.includes('2000') ? '2000' : '200';
+      tr.innerHTML =
+        '<td class="rank">' + (i+1) + '</td>' +
+        '<td>' + escHtml(r.name) + '</td>' +
+        '<td>' + modeShort + corners + '</td>' +
+        '<td>' + fmtTime(r.time) + '</td>' +
+        '<td>' + r.crashes + '</td>' +
+        '<td>' + r.flips + '</td>' +
+        '<td>' + fmtDate(r.date) + '</td>';
+      lbBody.appendChild(tr);
+    });
+  }
+  function escHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function showLeaderboard(pendingScore){
+    lbPendingScore = pendingScore || null;
+    lbNameRow.style.display = pendingScore ? 'flex' : 'none';
+    lbSaveBtn.disabled = !pendingScore;
+    if (pendingScore) lbNameInput.value = '';
+    renderLeaderboard();
+    lbEl.classList.add('on');
+  }
+  function hideLeaderboard(){
+    lbEl.classList.remove('on');
+    lbPendingScore = null;
+  }
+  lbCloseBtn.addEventListener('click', hideLeaderboard);
+  msLbBtn.addEventListener('click', ()=> showLeaderboard(null));
+  lbTabsEl.querySelectorAll('.lb-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      lbTabsEl.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      lbFilter = tab.dataset.filter;
+      renderLeaderboard();
+    });
+  });
+  lbSaveBtn.addEventListener('click', ()=>{
+    if (!lbPendingScore) return;
+    const name = (lbNameInput.value || '').trim() || '匿名车手';
+    lbAddScore({ ...lbPendingScore, name: name.slice(0,12) });
+    lbPendingScore = null;
+    lbNameRow.style.display = 'none';
+    lbSaveBtn.disabled = true;
+    renderLeaderboard();
+  });
+  lbNameInput.addEventListener('keydown', e=>{
+    if (e.key === 'Enter') lbSaveBtn.click();
+  });
+
   /* ---------------------------- 18. 关卡二 ---------------------------- */
   function startLevel2(mode){
     gameMode = mode || gameMode || 'normal200';
@@ -2521,6 +2709,15 @@ function mulberry32(a){
     endingEl.style.opacity = '1';
     againBtn.classList.remove('on');
     Taunt.clear();
+
+    // 准备排行榜成绩
+    lbPendingScore = {
+      mode: gameMode,
+      time: game.playTime,
+      crashes: game.crashes,
+      flips: game.flips,
+      date: Date.now()
+    };
   }
 
   function worstCorner(){
@@ -2560,6 +2757,10 @@ function mulberry32(a){
     setTimeout(()=>{
       endingEl.classList.add('hidden');
       againBtn.classList.add('on');
+      // 弹出排行榜，带上待提交成绩
+      if (lbPendingScore){
+        showLeaderboard(lbPendingScore);
+      }
     }, 900);
   }
 
@@ -2567,6 +2768,7 @@ function mulberry32(a){
     againBtn.classList.remove('on');
     endingEl.classList.add('hidden');
     endingEl.style.opacity = '1';
+    hideLeaderboard();
     // 回到模式选择
     state = State.MODE_SELECT;
     showModeSelect();
